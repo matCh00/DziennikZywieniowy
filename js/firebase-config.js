@@ -1,6 +1,6 @@
 // Public Firebase web configuration only. It is safe to publish these client values.
 // Never put a Firebase service-account JSON/private key in this file.
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDj44v0jPXqJtn2VEoYyG0eE1eRUXwzOQQ",
   authDomain: "dziennik-zywieniowy-dddc7.firebaseapp.com",
   projectId: "dziennik-zywieniowy-dddc7",
