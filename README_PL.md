@@ -11,7 +11,7 @@ Responsywna aplikacja do dziennego monitorowania kalorii, produktów, gramatur, 
 - `docs/FATSECRET_SETUP.md` — rejestracja, bezpłatne plany, limity i konfiguracja FatSecret.
 - `docs/OPEN_FOOD_FACTS_SETUP.md` — konto, API, eksporty, limity i licencje OFF.
 - `docs/BAZA_LOKALNA_OFF.md` — pełna instrukcja aktualizacji katalogu i importu w aplikacji.
-- `docs/KATALOG_STARTOWY.md` — opis katalogu startowego (ponad 1200 pozycji), pochodzenia i ograniczeń dokładności.
+- `docs/KATALOG_STARTOWY.md` — opis katalogu startowego (1189 pozycji), pochodzenia i ograniczeń dokładności.
 - `js/firebase-config.js`, `js/firebase-sync.js`, `firestore.rules` — logowanie e-mail/hasło i synchronizacja danych per konto.
 - `tests/` — testy bez prawdziwych kluczy API.
 
@@ -23,7 +23,7 @@ W aplikacji wybierasz jedną z dwóch ścieżek:
 
 Aplikacja szuka w:
 
-1. 1255 wbudowanych pozycji referencyjnych (produkty bazowe i warianty przygotowania, w tym wiele rodzajów pieczywa);
+1. 1189 wbudowanych pozycji referencyjnych (produkty bazowe, warianty przygotowania i codzienne produkty sklepowe, w tym wiele rodzajów pieczywa);
 2. produktach własnych, które dodasz w aplikacji;
 3. lokalnym katalogu Open Food Facts zaimportowanym do IndexedDB.
 
@@ -31,7 +31,9 @@ Zapisany katalog działa offline po zaimportowaniu. Jest związany z daną przeg
 
 ### Katalog startowy bez pobierania dużych plików
 
-Wbudowany katalog `js/seed-products.js` + `js/seed-products-extra.js` zawiera 1255 pozycji: bazowe produkty codzienne oraz orientacyjne warianty przygotowania (np. gotowane, pieczone, grillowane, opiekane). Działa offline i nie wymaga importu dużego pliku. To wartości referencyjne dla produktów ogólnych, nie oficjalne karty SKU czterech sieci. Wyszukiwanie „bułka” zwraca szeroki wybór pieczywa. Wartości wariantów technologicznych są szacunkowe i zależą od receptury oraz utraty/przyrostu wody i tłuszczu. Przy produktach pakowanych nadrzędne są wartości z etykiety konkretnego opakowania. Pełny opis źródeł i ograniczeń znajdziesz w [`docs/KATALOG_STARTOWY.md`](docs/KATALOG_STARTOWY.md).
+Wbudowany katalog w jednym pliku `js/seed-products.js` zawiera 1189 pozycji: bazowe produkty codzienne oraz orientacyjne warianty przygotowania (np. gotowane, pieczone, grillowane, opiekane). Działa offline i nie wymaga importu dużego pliku. To wartości referencyjne dla produktów ogólnych, nie oficjalne karty SKU czterech sieci. Wyszukiwanie „bułka” zwraca szeroki wybór pieczywa. Wartości wariantów technologicznych są szacunkowe i zależą od receptury oraz utraty/przyrostu wody i tłuszczu. Przy produktach pakowanych nadrzędne są wartości z etykiety konkretnego opakowania. Pełny opis źródeł i ograniczeń znajdziesz w [`docs/KATALOG_STARTOWY.md`](docs/KATALOG_STARTOWY.md).
+
+Aplikacja ma cztery zakładki: **Dziennik**, **Plan tygodnia**, **Moje przepisy** i **Produkty**. Wszystkie ikony to jeden wbudowany sprite SVG (`index.html`), a dziennik pokazuje przy każdym wpisie i w podsumowaniu posiłku białko, tłuszcze i węglowodany wraz z udziałem energii (4/9/4 kcal na gram). Posiłki dodajesz do dnia wyłącznie w zakładce „Dziennik” — kartą „Dodaj produkt/danie/dzień”, która obsługuje pojedynczy produkt, zapisane danie z przepisów oraz wybrany dzień z własnego planu. Zakładka „Produkty” zawiera cały katalog startowy (tylko odczyt) oraz dodawanie, edycję i usuwanie własnych produktów. Pełny opis zależności między produktem, posiłkiem, daniem i planem: [`docs/FLOW.md`](docs/FLOW.md).
 
 Pierwsze uruchomienie wymaga uzupełnienia **obu profili jednocześnie** — kobiety i mężczyzny. Jeżeli aktualizacja zastanie zapisany tylko jeden profil, kreator poprosi o brakujące parametry i pokaże istniejący profil do weryfikacji.
 

@@ -2,7 +2,7 @@
 
 ## Zawartość
 
-Aplikacja zawiera **1255 lekkich pozycji startowych** (266 wcześniejszych wpisów oraz 989 dodatkowych pozycji, w tym warianty przygotowania) w plikach `js/seed-products.js` i `js/seed-products-extra.js`. Katalog obejmuje codzienne kategorie: owoce, warzywa, pieczywo, różne rodzaje bułek, produkty zbożowe, nabiał, jaja, mięso, ryby, rośliny strączkowe, konserwy, tłuszcze, sosy, orzechy, słodycze, dania gotowe i napoje. Oba pliki z danymi ważą łącznie kilkadziesiąt kilobajtów, więc nie wymaga pobierania wielogigabajtowego eksportu.
+Aplikacja zawiera **1189 lekkich pozycji startowych** w jednym pliku `js/seed-products.js` (produkty bazowe, warianty przygotowania oraz codzienne produkty sklepowe). Katalog obejmuje codzienne kategorie: owoce, warzywa, pieczywo, różne rodzaje bułek, produkty zbożowe, nabiał, jaja, mięso, ryby, rośliny strączkowe, konserwy, tłuszcze, sosy, orzechy, słodycze, dania gotowe i napoje. Plik z danymi waży kilkadziesiąt kilobajtów, więc nie wymaga pobierania wielogigabajtowego eksportu.
 
 Wyszukiwanie `bułka` powinno pokazywać różne warianty: kajzerkę, bułkę pszenną, grahamkę, wieloziarnistą, z ziarnami, żytnią, orkiszową, proteinową, mleczną, maślaną, słodką, do hot doga, hamburgerową, bajgiel, precel, ciabattę, bagietkę, wariant bezglutenowy i inne produkty piekarnicze.
 
@@ -18,7 +18,7 @@ Wartość należy traktować jako przybliżenie do szybkiego dziennika. Przy opa
 
 Jedna pozycja `Bułka słodka drożdżowa` ma jawne źródło DTU Frida (food ID 1334): 296 kcal, białko 9,1 g, tłuszcz 6,6 g, węglowodany 48,7 g / 100 g. Jest to duńska kategoria referencyjna „Rolls, sweet dough type”, nie polski SKU. Link: https://frida.fooddata.dk/index.php/food/1334?lang=en . Zbiór Frida 6.1 jest publikowany na licencji CC BY 4.0 — przy tej pozycji zachowujemy wskazanie źródła i licencji.
 
-**Nie opisujemy wszystkich 1255 rekordów jako oficjalnie potwierdzonych danych sklepowych.** Byłoby to nieprawdziwe. To lekka, praktyczna baza początkowa z wartościami orientacyjnymi, którą można potem zastępować etykietami konkretnych produktów.
+**Nie opisujemy wszystkich 1189 rekordów jako oficjalnie potwierdzonych danych sklepowych.** Byłoby to nieprawdziwe. To lekka, praktyczna baza początkowa z wartościami orientacyjnymi, którą można potem zastępować etykietami konkretnych produktów.
 
 ## Co jest potrzebne, aby mieć oficjalne wartości dla szerokiej gamy produktów?
 
@@ -45,10 +45,45 @@ Do dokładnych pozycji sklepowych używaj w pierwszej kolejności:
 
 ## Wersja 3.2 — rozszerzenie katalogu
 
-Wbudowany katalog zawiera **1255 wpisów**. Rozszerzenie dodaje owoce egzotyczne i suszone, warzywa i grzyby, dodatkowe rodzaje pieczywa, napoje roślinne, sery, mięso i ryby, kasze, mąki, strączki, przetwory, przekąski i dania gotowe. Dla wielu produktów przygotowano również odmiany technologiczne, np. gotowane, na parze, pieczone, grillowane, opiekane, suszone lub w wersji lekkiej.
+Wbudowany katalog zawiera **1189 wpisów**. Rozszerzenie dodaje owoce egzotyczne i suszone, warzywa i grzyby, dodatkowe rodzaje pieczywa, napoje roślinne, sery, mięso i ryby, kasze, mąki, strączki, przetwory, przekąski i dania gotowe. Dla wielu produktów przygotowano również odmiany technologiczne, np. gotowane, na parze, pieczone, grillowane, opiekane lub w wersji lekkiej. Wariant „suszone” dla owoców został wycofany, bo mnożniki dawały wartości niemożliwe fizycznie.
 
 **Ważne:** wartości dla odmian technologicznych są estymacjami referencyjnymi. Nie są wynikiem laboratoryjnego badania każdego wariantu ani danymi z etykiety konkretnej marki. Przykładowo „pierś z kurczaka · grillowana” opisuje ogólny wariant przygotowania; faktyczna energia zależy od ubytku wody, dodatku tłuszczu i receptury. Użytkownik powinien traktować te rekordy jako szybkie przybliżenia, a etykiety opakowań jako źródło nadrzędne.
 
 Każdy rekord ma `source`, `sourceKind`, `store` i `dataNote`. Wpisy ogólne są oznaczone jako `store: Ogólne` oraz `sourceKind: generic-reference`. Jedyny rekord wyraźnie oznaczony jako opublikowany i licencjonowany (bułka słodka) zachowuje odwołanie do DTU Frida i CC BY 4.0.
 
 Liczba pozycji jest walidowana testami automatycznymi (minimum 1000), identyfikatory muszą być unikalne, a wartości kalorii i makroskładników mieszczą się w zadanych zakresach.
+
+## Walidacja i źródła (wersja 2026-11-20.1)
+
+Katalog jest kontrolowany automatycznie:
+
+```bash
+node tools/validate_seed_products.mjs        # pełny raport
+node tools/validate_seed_products.mjs --verbose
+```
+
+Walidator sprawdza komplet pól, unikalność identyfikatorów i nazw, zakresy
+kalorii i makroskładników, sumę makroskładników (≤ 100 g) oraz zgodność energii
+z białkiem, tłuszczem i węglowodanami (4/9/4 kcal na gram, tolerancja na błonnik).
+Dwa rekordy otrębów mają energię wprost z tabeli źródłowej i są raportowane jako
+„wyjątek źródłowy”, a nie błąd.
+
+Wersja 2026-11-20.1 poprawia wykryte błędy:
+
+- oliwki zielone miały tłuszcz 0,5 g zamiast 15,3 g (USDA FDC: 145 kcal / 100 g);
+- usunięto zduplikowaną „Kapustę kiszoną”;
+- usunięto wariant „suszone” dla owoców, który dawał fizycznie niemożliwe wartości
+  (np. 764 kcal i 405 kcal z makroskładników);
+- energia wariantów przygotowania jest liczona z ich własnych makroskładników,
+  więc kcal i makro nie rozjeżdżają się;
+- identyfikatory są w ASCII (bez polskich znaków).
+
+Dodano kilkadziesiąt codziennych produktów sklepowych (pieczywo, nabiał, wędliny,
+mąki i kasze, warzywa, przekąski, dania gotowe), oznaczonych źródłem
+„Wartość referencyjna · USDA FoodData Central / NIZP PZH (kategoria ogólna)”.
+
+Źródła:
+
+- USDA FoodData Central — dane w domenie publicznej (CC0 1.0): https://fdc.nal.usda.gov/
+- NIZP PZH — Tabele wartości odżywczej (licencja): https://www.pzh.gov.pl/uslugi/tabele-wartosci-odzywczej-produktow/
+- Rozporządzenie (UE) 1169/2011 — deklaracja na 100 g: https://eur-lex.europa.eu/eli/reg/2011/1169/oj/pol

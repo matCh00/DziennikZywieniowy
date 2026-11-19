@@ -151,7 +151,7 @@ body[data-profile="female"]{--profile-accent:#c65b91}body[data-profile="male"]{-
 .plan-assignment-row{display:grid;grid-template-columns:1fr 1.1fr 2fr .7fr 34px;gap:8px;align-items:end;padding:10px;margin:8px 0;border:1px solid var(--line);border-radius:14px;background:#fbfcfa;}
 .plan-assignment-row label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:10px;color:var(--muted);}
 .plan-assignment-row input,.plan-assignment-row select{width:100%;min-width:0;padding:9px;font-size:11px;}
-.plan-assignment-row .remove-assignment{height:36px;border:0;border-radius:10px;background:#f8eeec;color:#aa645b;font-size:19px;}
+.plan-assignment-row .remove-assignment{height:34px;}
 
 @media(max-width:1050px){
   .primary-bento{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -202,7 +202,7 @@ body[data-profile="female"]{--profile-accent:#c65b91}body[data-profile="male"]{-
   .plan-assignment-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
   .plan-assignment-row .assignment-recipe{grid-column:1/-1;}
   .plan-assignment-row .assignment-servings{grid-column:1;}
-  .plan-assignment-row .remove-assignment{grid-column:2;justify-self:end;width:36px;}
+  .plan-assignment-row .remove-assignment{grid-column:2;justify-self:end;width:34px;}
 }
 @media(max-width:380px){
   .dashboard-section-heading h2{font-size:19px;}
@@ -242,3 +242,148 @@ body[data-profile="male"]{--profile-accent:#397bc5}body[data-profile="male"] .pr
 @media(max-width:700px){.recipe-editor-top{grid-template-columns:1fr}.recipe-notes-grid{grid-template-columns:1fr}.top-actions{gap:6px}.save-state{display:none}.account-logout{padding:7px 8px}.auth-gate{padding:12px}}
 
 body[data-profile="female"] .avatar.female{background:#f9e5ef;color:#c65b91}body[data-profile="male"] .avatar.male{background:#e4effc;color:#397bc5}.auth-gate .primary{background:#1f634b!important}
+
+/* ===========================================================================
+   Spójność wizualna: wspólne ikony akcji, wyśrodkowana lupa, karty widoków.
+   Ten blok jest celowo na końcu pliku, aby ujednolicić wcześniejsze reguły.
+   =========================================================================== */
+
+/* ===========================================================================
+   Jednolity system ikon: sprite SVG (definicje w index.html) + wspólne wymiary.
+   Każda ikona to ikona liniowa 24×24, rysowana w currentColor.
+   =========================================================================== */
+.icon-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.i{width:16px;height:16px;flex:0 0 auto;display:inline-block;vertical-align:-.16em;pointer-events:none}
+.tab-ico{display:grid;place-items:center;width:18px;height:18px;flex:0 0 auto}
+.tab-ico .i{width:17px;height:17px}
+.icon-button .i{width:19px;height:19px}
+.icon-button,.close,.clear-button,.mkdir{display:grid;place-items:center}
+.close .i,.clear-button .i{width:14px;height:14px}
+.metric-symbol .i{width:20px;height:20px}
+.mini-card-icon .i{width:17px;height:17px}
+.recipe-emoji .i{width:19px;height:19px}
+.empty-symbol .i{width:22px;height:22px}
+.product-emoji .i{width:18px;height:18px}
+.result-placeholder .i{width:19px;height:19px}
+.icon-delete .i{width:15px;height:15px}
+.water-icon{width:38px;height:38px;border-radius:13px;background:#e9f2f8;color:#4a86a3;display:grid;place-items:center;flex:0 0 auto}
+.water-icon .i{width:20px;height:20px}
+.mode-chip{display:inline-flex;align-items:center;gap:6px}
+.mode-chip .i{width:14px;height:14px;color:currentColor}
+.primary .i,.secondary .i,.outline .i,.file-button .i,.text-button .i{width:15px;height:15px}
+.text-button{display:inline-flex;align-items:center;gap:5px}
+.search-icon{display:grid;place-items:center;width:16px;height:16px;flex:0 0 16px;color:#7d9585}
+.search-icon .i{width:15px;height:15px}
+.recipe-search>span.search-icon{font-size:0}
+#searchButton{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+#searchButton .search-icon{width:14px;height:14px;flex-basis:14px;color:currentColor}
+#searchButton .search-icon .i{width:13px;height:13px}
+
+/* Jednolity przycisk usuwania (×) i edycji (✎) w całej aplikacji. */
+.icon-delete{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;padding:0;border:1px solid #f0d9d5;border-radius:11px;background:#fdf6f4;color:#a65c52;font-size:19px;line-height:1}
+.icon-delete:hover{background:#fbeeea;border-color:#e7c6be;color:#93483d}
+.icon-button.subtle-icon{color:var(--green)}
+.primary,.secondary,.outline{display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2;white-space:nowrap}
+
+/* Karta „Dodaj produkt/danie/dzień” z trzema trybami. */
+.card-hint{font-size:10.5px;line-height:1.55;color:var(--muted);margin:-5px 0 11px;max-width:640px}
+.mode-switch{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:#eef4ee;border-radius:13px;margin-bottom:12px}
+.mode-chip{border:0;background:transparent;color:#6d7b74;border-radius:10px;padding:8px 11px;font-size:11px;font-weight:800;white-space:nowrap}
+.mode-chip:hover{color:var(--green)}
+.mode-chip.active{background:#fff;color:var(--green);box-shadow:0 2px 8px rgba(23,59,50,.09)}
+.add-mode-panel{min-width:0}
+.panel-note{font-size:10.5px;line-height:1.55;color:var(--muted);margin:0 0 10px}
+.add-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+.add-form-grid label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:10px;color:var(--muted)}
+.add-form-grid .add-form-wide{grid-column:1/-1}
+.add-form-grid input,.add-form-grid select{width:100%;min-width:0;padding:9px;font-size:12px}
+
+/* Plan tygodnia: ten sam układ nagłówka i sekcji co „Moje przepisy” i „Produkty”. */
+.week-hero{margin:4px 0 14px}
+.week-hero>div{min-width:0;max-width:760px}
+.week-hero h1{font:800 clamp(23px,3vw,31px) Manrope,sans-serif;letter-spacing:-.05em;margin:0}
+.week-hero p:not(.eyebrow){font-size:12px;color:var(--muted);line-height:1.55;margin:7px 0 0}
+#weekView .subsection-heading{margin:18px 0 10px}
+#weekView .subsection-heading:first-of-type{margin-top:4px}
+.sample-note{font-size:9.5px;color:var(--muted);line-height:1.45;margin:9px 0 0}
+.footer-hint{font-size:9.5px;color:var(--muted);text-align:right;line-height:1.45}
+.recipe-steps{font-size:10.5px;line-height:1.55;max-width:560px}
+.recipe-steps b{color:#4b6b58}
+
+/* Karty w „Moich przepisach” — same ikony akcji, spójne z planami. */
+.recipe-card-actions{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:auto}
+.recipe-card-actions button{padding:0;font-size:10px;min-width:0}
+.recipe-card-actions .icon-button,.recipe-card-actions .icon-delete{font-size:15px}
+.recipe-card-actions .icon-delete{font-size:19px}
+
+/* Widok „Produkty”. */
+.products-board{display:block}
+.products-hero{margin-bottom:12px}
+.products-quick{margin:0 0 16px;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:#fff}
+.product-toolbar{margin:0 0 4px}
+.product-toolbar .recipe-search{max-width:560px}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:11px}
+.product-card{display:flex;flex-direction:column;gap:9px;min-width:0;padding:13px;border:1px solid #e2eae2;border-radius:16px;background:#fff;box-shadow:0 8px 22px rgba(23,59,50,.045)}
+.product-card-head{display:flex;align-items:flex-start;gap:9px;min-width:0}
+.product-emoji{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border-radius:11px;background:#eff6ef;font-size:17px}
+.product-identity{display:flex;flex-direction:column;flex:1;min-width:0}
+.product-identity b{font-size:12.5px;line-height:1.3;overflow-wrap:anywhere}
+.product-identity small{font-size:9.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.product-kcal{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;white-space:nowrap;font:800 15px Manrope;color:var(--green)}
+.product-kcal small{font:600 8px 'DM Sans';color:var(--muted)}
+.product-macros{display:flex;flex-wrap:wrap;gap:5px}
+.product-macros span{border:1px solid #edf1ec;background:#f9fbf8;border-radius:8px;padding:4px 7px;font-size:9.5px;color:var(--muted)}
+.product-macros b{color:var(--ink);font-size:10px;font-weight:700}
+.product-card-actions{display:flex;gap:6px;margin-top:auto}
+.product-card-actions .secondary{flex:1 1 auto;min-width:0;padding:8px 10px;font-size:10.5px}
+.custom-product{border-color:#d6e6d7;background:linear-gradient(150deg,#fff,#f8fcf8)}
+.product-empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:26px 18px;border:1px dashed #cad9ca;border-radius:18px;background:rgba(255,255,255,.72);text-align:center}
+.product-empty b{font:800 14px Manrope}
+.product-empty p{font-size:11px;color:var(--muted);margin:0;max-width:420px}
+
+/* Responsywność nowych elementów i modali. */
+@media(max-width:900px){
+  .week-hero{align-items:stretch;flex-direction:column}
+  .week-heading-actions{justify-content:flex-start}
+  .week-heading-actions .date-field{flex:1 1 auto;min-width:0}
+}
+@media(max-width:700px){
+  .product-grid{grid-template-columns:minmax(0,1fr)}
+  .products-quick{padding:9px 10px}
+  .mode-switch{gap:3px}
+  .mode-chip{flex:1 1 auto;text-align:center;padding:8px 8px;font-size:10.5px}
+  .week-heading-actions{display:grid;grid-template-columns:minmax(0,1fr);width:100%}
+  .week-heading-actions>.primary{width:100%}
+  .footer-hint{text-align:left}
+  .custom-plan-footer{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+  .ingredient-row .remove-ingredient{width:34px;max-width:34px;height:34px;justify-self:end}
+  .dialog,.dialog.wide{width:min(560px,calc(100vw - 16px));max-height:94dvh}
+  .dialog-body{max-height:94dvh;padding:17px}
+  .dialog-actions{flex-wrap:wrap}
+  .dialog-actions button{flex:1 1 auto;min-width:120px}
+}
+@media(max-width:620px){
+  .tabs{width:100%;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:1 0 auto;padding:9px 8px;font-size:11px;gap:5px}
+}
+@media(max-width:420px){
+  .tab-ico{display:none}
+  .tab{padding:9px 4px;font-size:10px}
+  .add-form-grid{grid-template-columns:1fr}
+  .product-card-actions{flex-wrap:wrap}
+  .product-card-actions .secondary{flex:1 1 100%}
+}
+/* Nagłówek dialogu: zamknięcie zawsze u góry, także przy dłuższym opisie. */
+.dialog-title{align-items:flex-start}
+.dialog-title .close{flex:0 0 auto;margin-top:-2px}
+
+/* Makroskładniki: wartości, udział energii i uczciwa informacja o brakach. */
+.macro-row small{font-size:8.5px;line-height:1.2;color:#8b9a90;letter-spacing:.01em}
+.macro-row b{font-variant-numeric:tabular-nums}
+.meal-macros{font-variant-numeric:tabular-nums;color:#7d8c83!important}
+.macro-note{font-size:9.5px;line-height:1.45;color:var(--muted);margin:8px 0 0;min-height:0}
+.weight-history div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3px 0}
+.weight-history b{color:var(--ink)}
+.plan-assignment-row .remove-assignment{height:34px;border:0;padding:0}
+@media(max-width:700px){.macro-row{gap:9px}.macro-row small{font-size:8px}}

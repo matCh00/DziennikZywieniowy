@@ -4,7 +4,7 @@ import {seedProducts,seedCatalogInfo} from '../js/seed-products.js';
 import {normalizeText} from '../js/catalog.js';
 
 test('starter catalog has stable unique records and valid nutrients',()=>{
-  assert.ok(seedProducts.length>=1000,`expected expanded starter catalog, got ${seedProducts.length}`);
+  assert.ok(seedProducts.length>=1050,`expected expanded starter catalog, got ${seedProducts.length}`);
   assert.equal(new Set(seedProducts.map(p=>p.id)).size,seedProducts.length,'product IDs must be unique');
   for(const p of seedProducts){
     assert.ok(p.id&&p.name&&p.category,`missing identity for ${p.id}`);
@@ -14,7 +14,7 @@ test('starter catalog has stable unique records and valid nutrients',()=>{
     assert.equal(p.sourceKind==='generic-reference'||p.sourceKind==='published-reference',true);
   }
   assert.equal(seedCatalogInfo.count,seedProducts.length);
-  assert.match(seedCatalogInfo.version,/2026-11-19\.2/);
+  assert.match(seedCatalogInfo.version,/2026-11-20.1/);
 });
 
 test('search for bułka returns multiple daily bread variants',()=>{

@@ -36,7 +36,10 @@ test('custom plans support create, edit, delete and recipes are their only sourc
   assert.match(app,/data-edit-plan/);
   assert.match(app,/data-delete-plan/);
   assert.match(app,/!a\.recipeId\|\|!planRecipeById\(a\.recipeId\)/);
-  assert.match(app,/data-add-custom-plan/);
+  // Cały plan nie jest już dodawany jednym przyciskiem: do dziennika trafia wybrany dzień planu.
+  assert.doesNotMatch(app,/data-add-custom-plan/);
+  assert.match(html,/data-add-mode="plan-day"/);
+  assert.match(app,/function addPlanDayToDiary\(/);
   assert.match(app,/currentPlanData\(\)/);
 });
 
@@ -56,9 +59,12 @@ test('backup controls are in settings, not in the sticky header',()=>{
 });
 
 
-test('service worker pre-caches the expanded starter catalog module',()=>{
+test('service worker pre-caches the single merged starter catalog module',()=>{
   const sw=readFile(new URL('../sw.js',import.meta.url),'utf8');
-  return sw.then(source=>assert.match(source,/seed-products-extra\.js/));
+  return sw.then(source=>{
+    assert.match(source,/seed-products\.js/);
+    assert.doesNotMatch(source,/seed-products-extra/);
+  });
 });
 
 test('responsive layout promotes main diary cards and full-width secondary cards on phones',()=>{
