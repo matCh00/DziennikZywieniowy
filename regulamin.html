@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#315e65">
+  <title>Regulamin i źródła danych — Dziennik Żywieniowy</title>
+  <style>
+    :root{color-scheme:light;--ink:#1d3035;--muted:#66777d;--line:#e2e9e9;--bg:#f4f7f7;--accent:#315e65}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{width:min(820px,calc(100% - 32px));margin:36px auto 64px;background:#fff;padding:clamp(22px,5vw,48px);border:1px solid var(--line);border-radius:22px;box-shadow:0 12px 40px #1d30350d}h1,h2{line-height:1.2;letter-spacing:-.03em}h1{font-size:clamp(28px,5vw,38px);margin:4px 0 22px}h2{font-size:20px;margin:30px 0 10px}.eyebrow{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}p,li{color:#4b5e63}a{color:#24616b;text-underline-offset:3px}li{margin:6px 0}.note{padding:14px 16px;border-radius:13px;background:#f0f6f4;color:#365b59;font-size:14px}.back{display:inline-block;margin-top:24px;font-weight:700;text-decoration:none}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <p class="eyebrow">Dziennik Żywieniowy · źródła i zasady</p>
+    <h1>Regulamin i źródła danych</h1>
+    <p>Dziennik Żywieniowy jest narzędziem do osobistej samoobserwacji żywieniowej. Nie jest usługą medyczną, diagnozą ani poradą dietetyczną. Użytkownik sam odpowiada za sprawdzanie produktów, gramatur i wartości z etykiety.</p>
+
+    <h2>1. Kalkulatory</h2>
+    <p>REE jest wartością szacunkową obliczaną równaniami Henry’ego opisanymi w polskich Normach żywienia 2024 NIZP PZH–PIB. TDEE to REE pomnożone przez PAL. BMI jest wskaźnikiem przesiewowym, a nie oceną składu ciała. Wartości celu redukcyjnego w aplikacji są scenariuszami matematycznymi, a nie zaleceniami WHO, NFZ lub PZH.</p>
+
+    <h2>2. Produkty i jakość danych</h2>
+    <p>Katalog lokalny zawiera wartości generyczne i orientacyjne. Importowany katalog Open Food Facts jest niezależną bazą pochodną, która musi być udostępniana zgodnie z ODbL. Dane online mogą pochodzić z Open Food Facts lub FatSecret. Produkty FatSecret są domyślnie dostępne wyłącznie do podglądu, a trwały zapis jest blokowany do czasu uzyskania osobnych praw do przechowywania danych. Brak gwarancji, że dane są kompletne, aktualne, zgodne z konkretną partią lub etykietą sklepową. Użytkownik powinien weryfikować informacje na opakowaniu. Własne wartości wpisuje sam użytkownik.</p>
+    <p>Open Food Facts jest bazą współtworzoną przez społeczność. Baza jest udostępniana na licencji ODbL, a zdjęcia podlegają odrębnym licencjom. Więcej: <a href="https://openfoodfacts.github.io/openfoodfacts-server/api/" target="_blank" rel="noopener">dokumentacja Open Food Facts</a> i <a href="https://world.openfoodfacts.org/data" target="_blank" rel="noopener">eksport danych</a>.</p>
+
+    <h2>3. Warunki FatSecret</h2>
+    <p>Jeżeli administrator aplikacji skonfigurował integrację FatSecret, użytkownik korzystający z wyników tej integracji zobowiązuje się zapoznać z <a href="https://platform.fatsecret.com/terms" target="_blank" rel="noopener">warunkami korzystania z FatSecret Platform API</a> oraz je przestrzegać. Dane pochodzące z FatSecret są oznaczane w aplikacji nazwą źródła „FatSecret”. Zgodnie z dokumentacją FatSecret tylko `food_id` i `serving_id` są wymienione jako dane do przechowywania bezterminowego; pozostałe treści należy usunąć lub odświeżyć w ciągu 24 godzin. Aplikacja ogranicza pamięć podręczną odpowiedzi FatSecret do 10 minut po stronie Cloudflare i do 10 minut w pamięci bieżącej karty przeglądarki. Długoterminowe przechowywanie danych żywieniowych pochodzących z FatSecret w historii dziennika może wymagać odrębnej zgody lub umowy. Administrator wdrożenia powinien uzyskać potwierdzenie od FatSecret przed użyciem produkcyjnym. FatSecret może zmieniać limity, zakres API i warunki licencji.</p>
+
+
+    <h2>4. Licencje i źródła</h2>
+    <p>Produkty importowane z Open Food Facts pochodzą z bazy udostępnianej na ODbL; rekordy i zdjęcia mogą podlegać odrębnym licencjom. Publiczne rozpowszechnianie katalogu pochodnego wymaga sprawdzenia obowiązków atrybucji i udostępniania bazy pochodnej. Zobacz <a href="https://openfoodfacts.github.io/openfoodfacts-server/api/tutorials/license-be-on-the-legal-side/" target="_blank" rel="noopener">oficjalne wyjaśnienie licencji OFF</a>. FatSecret nie jest importowany do miesięcznego katalogu lokalnego.
+
+    <h2>5. Dane osobowe i synchronizacja</h2>
+    <p>Profile, dzienniki, masa ciała, własne produkty, plany i przepisy są przypisane do konta użytkownika Firebase Authentication (e-mail/hasło) i synchronizowane z Firestore. Sesja logowania jest utrzymywana przez Firebase w pamięci przeglądarki; aplikacja nie zapisuje hasła. Lokalny cache aplikacji jest rozdzielany według identyfikatora UID konta. Dane profilu kobiety i mężczyzny są osobne, natomiast własne produkty, plany i przepisy są współdzielone w ramach jednego konta. Wyloguj się na urządzeniu współdzielonym i eksportuj kopie bezpieczeństwa.</p>
+
+    <h2>6. Bezpieczeństwo i ograniczenia</h2>
+    <ul>
+      <li>Nie wprowadzaj danych innych osób bez ich zgody.</li>
+      <li>Nie traktuj wyliczeń jako zaleceń medycznych.</li>
+      <li>Nie korzystaj z celów redukcyjnych bez konsultacji w ciąży, podczas karmienia, przy chorobach wymagających diety klinicznej lub zaburzeniach odżywiania.</li>
+      <li>Administrator powinien samodzielnie skonfigurować Firestore Security Rules i ograniczenia ruchu Cloudflare Worker.</li>
+      <li>Usługi zewnętrzne mogą być czasowo niedostępne, zmieniać API albo limity.</li>
+    </ul>
+    <p class="note">Korzystając z aplikacji, akceptujesz, że Dziennik Żywieniowy ma charakter pomocniczy i nie zastępuje specjalistycznej oceny. Korzystając z treści FatSecret, akceptujesz również ich odrębne warunki licencyjne.</p>
+    <a class="back" href="./">← Wróć do Dziennika Żywieniowego</a>
+  </main>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173b32">
+  <meta name="description" content="Dziennik Żywieniowy — monitorowanie kalorii, posiłków i przepisów.">
+  <title>Dziennik Żywieniowy</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <section id="authGate" class="auth-gate" aria-modal="true" role="dialog" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <div class="auth-brand"><img src="assets/icon.svg" alt=""><span>Dziennik Żywieniowy</span></div>
+      <p class="eyebrow">TWOJA PRZESTRZEŃ</p><h1 id="authTitle">Zaloguj się</h1>
+      <p class="auth-intro">Zaloguj się, aby bezpiecznie przechowywać swoje dzienniki, produkty i przepisy na koncie.</p>
+      <form id="authForm" class="auth-form">
+        <label>Adres e-mail<input id="authEmail" type="email" autocomplete="username" required maxlength="254" placeholder="adres@email.pl"></label>
+        <label>Hasło<input id="authPassword" type="password" autocomplete="current-password" required minlength="1" maxlength="128" placeholder="Hasło do konta"></label>
+        <p id="authError" class="error" role="alert"></p>
+        <button id="authSubmit" class="primary full" type="submit">Zaloguj się</button>
+      </form>
+      <div class="auth-links"><button type="button" id="authToggle">Nie masz konta? Utwórz konto</button><button type="button" id="authReset">Nie pamiętasz hasła?</button></div>
+      <p class="auth-footnote">Sesja pozostaje zapamiętana na tym urządzeniu. Hasło obsługuje Firebase Authentication — aplikacja go nie zapisuje.</p>
+    </div>
+  </section>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Dziennik Żywieniowy — strona główna">
+      <img src="assets/logo.png" alt="" class="brand-logo">
+      <span><strong>Dziennik Żywieniowy</strong><small>Twoje codzienne wybory, w jednym miejscu</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="save-state" id="saveState"><i></i> Oczekiwanie na logowanie</span><span id="accountEmail" class="account-email"></span><button class="secondary account-logout" id="logoutButton" type="button" hidden>Wyloguj</button>
+      <button class="icon-button" id="settingsOpen" title="Ustawienia" aria-label="Ustawienia">⚙</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="topline">
+      <div class="profile-switch" role="group" aria-label="Profil">
+        <button class="profile-tab active" data-profile="female"><span class="avatar female">K</span><span><b>Kobieta</b><small>Profil dzienny</small></span></button>
+        <button class="profile-tab" data-profile="male"><span class="avatar male">M</span><span><b>Mężczyzna</b><small>Profil dzienny</small></span></button>
+      </div>
+      <div class="date-box"><input id="entryDate" type="date" aria-label="Data dziennika"></div>
+    </section>
+
+    <nav class="tabs" aria-label="Sekcje aplikacji">
+      <button class="tab active" data-view="diary">◷ <span>Dziennik</span></button>
+      <button class="tab" data-view="week">▦ <span>Plan tygodnia</span></button>
+      <button class="tab" data-view="recipes">♧ <span>Moje przepisy</span></button>
+    </nav>
+
+    <section id="diaryView" class="view active">
+      <section class="dashboard-primary" aria-labelledby="mainDiaryHeading">
+        <div class="dashboard-section-heading primary-heading">
+          <div><p class="eyebrow">TWÓJ CODZIENNY PANEL</p><h2 id="mainDiaryHeading">Dzisiaj</h2><p>Najważniejsze informacje i szybkie dodawanie posiłków.</p></div>
+          <span class="section-marker">01 · DZIENNIK</span>
+        </div>
+        <div class="primary-bento">
+          <article class="card calorie-card span-2">
+            <div class="card-title"><div><p class="eyebrow">BILANS DNIA</p><h1>Twoje kalorie</h1></div></div>
+            <div class="calorie-content">
+              <div class="ring" id="calorieRing"><div><strong id="remaining">—</strong><small>kcal pozostało</small></div></div>
+              <div class="calorie-stats">
+                <div><span>Spożyto</span><b id="consumed">0 <small>kcal</small></b></div>
+                <div><span>Dzienny cel</span><b id="dailyTarget">— <small>kcal</small></b></div>
+                <div><span>Bilans do celu</span><b id="balance">—</b></div>
+                <p class="muted" id="targetHint">Uzupełnij parametry profilu, aby obliczyć cel.</p>
+              </div>
+            </div>
+            <div class="progress"><span id="progressBar"></span></div>
+            <div class="progress-meta"><span>0 kcal</span><span id="progressText">0% celu</span><span id="progressTarget">cel</span></div>
+          </article>
+
+          <article class="card add-card" id="addFoodCard">
+            <div class="card-title"><div><p class="eyebrow">DZIENNIK POSIŁKÓW</p><h2>Dodaj produkt</h2></div><button class="secondary" id="newProduct">＋ Własny produkt</button></div>
+            <div class="search-line"><span class="search-icon">⌕</span><input id="productSearch" type="search" placeholder="Szukaj, np. bułka grahamka, skyr…" autocomplete="off"><button id="clearSearch" class="clear-button" type="button" aria-label="Wyczyść">×</button></div>
+            <div class="search-options">
+              <label><span>Katalog</span><select id="catalogMode"><option value="saved">Zapisana baza</option><option value="online">Wyszukiwanie online</option></select></label>
+              <label id="sourceControl" class="hidden"><span>Źródło online</span><select id="onlineSource"><option value="fatsecret">FatSecret · PL (wymaga aktywacji)</option><option value="off">Open Food Facts · Polska</option><option value="all">FatSecret + Open Food Facts</option></select></label>
+              <button class="outline" id="searchButton">Szukaj</button>
+            </div>
+            <p class="help-line" id="searchStatus" aria-live="polite">Wpisz minimum 2 znaki. Wybór źródła FatSecret nie uruchamia zapytań Open Food Facts.</p>
+            <div id="selectedPanel" class="selected-panel hidden">
+              <div class="selected-head"><div><b id="selectedName">Produkt</b><small id="selectedMeta">— kcal / 100 g</small></div><button id="unselect" class="clear-button">×</button></div>
+              <p id="productStorageNote" class="storage-note hidden" role="status"></p>
+              <div class="portion-grid"><label>Posiłek<select id="mealType"><option>Śniadanie</option><option>II śniadanie</option><option>Obiad</option><option>Podwieczorek</option><option>Kolacja</option><option>Przekąski</option></select></label><label>Gramatura (g)<input id="grams" type="number" min="0.1" max="10000" step="0.1" value="100" inputmode="decimal"></label><div class="kcal-preview"><small>W tej porcji</small><b id="portionKcal">— kcal</b></div></div>
+              <div class="unit-shortcuts" id="unitShortcuts"></div><button class="primary full" id="addToDiary">Dodaj do dziennika</button>
+            </div>
+            <div class="quick-picks"><span>Szybki wybór</span><button data-quick="banana">Banan</button><button data-quick="chicken">Kurczak</button><button data-quick="oats">Płatki owsiane</button><button data-quick="skyr">Skyr</button></div>
+          </article>
+
+          <article class="card meals-card">
+            <div class="card-title"><div><p class="eyebrow">TWOJE SPOŻYCIE</p><h2>Posiłki w ciągu dnia</h2></div><span class="count-pill" id="entryCount">0 pozycji</span></div>
+            <div id="mealsList" class="meals-list"><div class="empty">Nie dodano jeszcze produktów do tego dnia.</div></div>
+            <div class="macro-row"><div><span>Białko</span><b id="proteinTotal">0 g</b><i><u id="proteinBar"></u></i></div><div><span>Tłuszcze</span><b id="fatTotal">0 g</b><i><u id="fatBar"></u></i></div><div><span>Węglowodany</span><b id="carbsTotal">0 g</b><i><u id="carbsBar"></u></i></div></div>
+          </article>
+
+          <article class="card water-card"><div class="card-title"><div><p class="eyebrow">DOBRY NAWYK</p><h2>Nawodnienie</h2></div><span class="water-icon">◉</span></div><div class="water-value"><strong id="waterValue">0</strong><span> / 2000 ml</span></div><div class="progress"><span id="waterBar"></span></div><div class="water-buttons"><button data-water="150">+150 ml</button><button data-water="250">+250 ml</button><button data-water="500">+500 ml</button></div><small class="muted">Cel orientacyjny — dostosuj do potrzeb.</small></article>
+        </div>
+      </section>
+
+      <section class="dashboard-secondary" aria-labelledby="insightsHeading">
+        <div class="dashboard-section-heading secondary-heading"><div><p class="eyebrow">TWOJE DANE</p><h2 id="insightsHeading">Statystyki i ustawienia</h2><p>Obserwuj zmiany i aktualizuj parametry profilu.</p></div><span class="section-marker">02 · ANALIZA</span></div>
+        <div class="secondary-top-grid">
+          <article class="card stats-card"><div class="card-title"><div><p class="eyebrow">OSTATNIE 7 DNI</p><h2>Kalorie</h2><p class="card-subtitle">Dzienna suma z zapisanych posiłków</p></div><span class="mini-card-icon">↗</span></div><div id="weekBars" class="week-bars"></div><div class="stats-footer"><span>Średnia spożycia</span><b id="weekAverage">— kcal</b></div></article>
+          <div class="secondary-profile-stack">
+            <article class="card profile-card">
+              <div class="card-title"><div><p class="eyebrow">USTAWIENIA PROFILU</p><h2>Twoje parametry i cel</h2></div><button class="text-button" id="editProfile">Edytuj ↗</button></div>
+              <div id="profileSummary" class="profile-summary"><div><strong>Skonfiguruj profil</strong><p class="muted">Wiek, wzrost, masa ciała i aktywność pozwolą oszacować zapotrzebowanie energetyczne.</p></div><button class="primary" id="setupProfile">Uzupełnij profil</button></div>
+            </article>
+            <article class="card weight-card"><div class="card-title"><div><p class="eyebrow">POSTĘPY</p><h2>Historia masy ciała</h2><p class="card-subtitle">Regularne pomiary pomagają obserwować trend.</p></div><span class="mini-card-icon">⌁</span></div><form id="weightForm" class="weight-form"><input id="weightInput" type="number" min="30" max="350" step="0.1" placeholder="Masa (kg)" aria-label="Masa ciała w kilogramach"><button class="secondary" type="submit">Zapisz pomiar</button></form><div id="weightHistory" class="weight-history muted">Brak zapisanych pomiarów.</div></article>
+          </div>
+        </div>
+        <div class="metrics-section">
+          <div class="metrics-heading"><div><p class="eyebrow">TWOJE WSKAŹNIKI</p><h3>Energia i sylwetka</h3><p>Szacunki aktualne dla wybranego profilu.</p></div></div>
+          <div class="metrics-grid" aria-label="Wskaźniki profilu">
+            <article class="card metric"><span class="metric-symbol" aria-hidden="true">◒</span><div><small>Wydatek spoczynkowy · REE</small><strong id="ree">—</strong><em>kcal / dobę</em></div></article>
+            <article class="card metric"><span class="metric-symbol" aria-hidden="true">⌁</span><div><small>Całkowity wydatek · TDEE</small><strong id="tdee">—</strong><em>kcal / dobę</em></div></article>
+            <article class="card metric"><span class="metric-symbol" aria-hidden="true">◎</span><div><small>Wskaźnik BMI</small><strong id="bmi">—</strong><em id="bmiLabel">uzupełnij profil</em></div></article>
+            <article class="card metric"><span class="metric-symbol" aria-hidden="true">⌖</span><div><small>Masa ciała</small><strong id="weightNow">—</strong><em>kg · ostatni pomiar</em></div></article>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="weekView" class="view hidden">
+      <div class="section-heading week-heading"><div><p class="eyebrow">PLANOWANIE · 7 DNI</p><h1>Plan żywieniowy na tydzień</h1><p class="muted">Układaj własne tygodnie z przepisów zapisanych w zakładce „Moje przepisy”. Przykładowe jadłospisy są tylko inspiracją.</p></div><div class="week-heading-actions"><label class="date-field">Data przykładowego tygodnia<input id="weekStart" type="date"></label><button id="createPlan" class="primary">＋ Stwórz własny plan</button></div></div>
+      <div class="subsection-heading"><div><p class="eyebrow">TWOJE PLANOWANIE</p><h2>Własne plany</h2><p class="muted">Edytowalne, zapisywane w Twoich danych i synchronizowane z Firebase.</p></div><span class="own-plan-count" id="ownPlanCount">0 planów</span></div>
+      <div id="customPlansList" class="custom-plans-list"></div>
+      <div class="subsection-heading sample-heading"><div><p class="eyebrow">INSPIRACJE</p><h2>Przykładowy tydzień</h2><p class="muted">Wzorcowy jadłospis do podglądu. Nie jest zapisywany i nie podlega edycji.</p></div><span class="sample-tag">PRZYKŁAD</span></div>
+      <div id="weeklyPlan" class="weekly-grid"></div>
+    </section>
+
+    <section id="recipesView" class="view hidden">
+      <div class="recipes-hero"><div><p class="eyebrow">TWOJA KOLEKCJA DAŃ</p><h1>Moje przepisy</h1><p>Twórz własne dania, wyliczaj wartości odżywcze z gramatury składników i wykorzystuj je w planach tygodniowych.</p></div><button id="createRecipe" class="primary">＋ Dodaj przepis</button></div>
+      <div class="recipe-overview"><div><strong id="recipeCount">0</strong><span>zapisanych przepisów</span></div><div><strong id="recipeAverage">—</strong><span>średnio kcal / porcję</span></div><div><strong id="recipeIngredientsCount">0</strong><span>składników w kolekcji</span></div></div>
+      <div class="recipe-toolbar"><label class="recipe-search"><span>⌕</span><input id="recipeSearch" type="search" placeholder="Szukaj przepisu lub składnika…"></label><label class="recipe-filter"><span>Posiłek</span><select id="recipeMealFilter"><option value="all">Wszystkie</option><option>Śniadanie</option><option>II śniadanie</option><option>Obiad</option><option>Podwieczorek</option><option>Kolacja</option></select></label></div>
+      <div id="recipesList" class="recipes-grid"></div>
+    </section>
+
+    <footer><span>Dziennik Żywieniowy · dane zapisują się automatycznie w tej przeglądarce.</span><button id="aboutOpen">Źródła i informacje</button></footer>
+  </main>
+
+  <div id="resultsPortal" class="results-portal hidden" role="listbox" aria-label="Wyniki wyszukiwania"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="setupBothDialog" class="dialog wide">
+    <form id="setupBothForm" class="dialog-body" novalidate>
+      <div class="dialog-title"><div><p class="eyebrow">PIERWSZA KONFIGURACJA</p><h2>Skonfiguruj oba profile</h2></div></div>
+      <p class="muted setup-intro">Uzupełnij parametry kobiety i mężczyzny. Dzięki temu oba profile będą od razu gotowe do codziennego używania. Później możesz je edytować niezależnie.</p>
+      <div class="setup-profile-grid">
+        <fieldset class="setup-profile-panel female-panel">
+          <legend><span class="avatar female">K</span> Kobieta</legend>
+          <div class="form-grid">
+            <label>Wiek (lata)<input name="femaleAge" type="number" min="19" max="100" required></label>
+            <label>Wzrost (cm)<input name="femaleHeight" type="number" min="120" max="230" step="0.1" required></label>
+            <label>Masa (kg)<input name="femaleWeight" type="number" min="30" max="350" step="0.1" required></label>
+            <label>Aktywność (PAL)<select name="femalePal"><option value="1.4">Niska · 1,4</option><option value="1.6" selected>Umiarkowana · 1,6</option><option value="1.8">Aktywna · 1,8</option><option value="2">Bardzo aktywna · 2,0</option></select></label>
+            <label class="full-field">Cel<select name="femaleGoal"><option value="0">Utrzymanie</option><option value="5">Deficyt 5%</option><option value="10" selected>Deficyt 10%</option><option value="15">Deficyt 15%</option><option value="20">Deficyt 20%</option></select></label>
+          </div>
+          <p class="field-error" id="femaleSetupError"></p>
+        </fieldset>
+        <fieldset class="setup-profile-panel male-panel">
+          <legend><span class="avatar male">M</span> Mężczyzna</legend>
+          <div class="form-grid">
+            <label>Wiek (lata)<input name="maleAge" type="number" min="19" max="100" required></label>
+            <label>Wzrost (cm)<input name="maleHeight" type="number" min="120" max="230" step="0.1" required></label>
+            <label>Masa (kg)<input name="maleWeight" type="number" min="30" max="350" step="0.1" required></label>
+            <label>Aktywność (PAL)<select name="malePal"><option value="1.4">Niska · 1,4</option><option value="1.6" selected>Umiarkowana · 1,6</option><option value="1.8">Aktywna · 1,8</option><option value="2">Bardzo aktywna · 2,0</option></select></label>
+            <label class="full-field">Cel<select name="maleGoal"><option value="0">Utrzymanie</option><option value="5">Deficyt 5%</option><option value="10" selected>Deficyt 10%</option><option value="15">Deficyt 15%</option><option value="20">Deficyt 20%</option></select></label>
+          </div>
+          <p class="field-error" id="maleSetupError"></p>
+        </fieldset>
+      </div>
+      <p class="muted small-note">REE to szacunek wyliczany wzorem Henry’ego z polskich Norm żywienia 2024; całkowity wydatek energetyczny szacujemy jako REE × PAL. Nie jest to pomiar medyczny.</p>
+      <div class="dialog-actions"><button class="primary" type="submit">Zapisz oba profile i rozpocznij</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="profileDialog" class="dialog">
+    <form id="profileForm" method="dialog" class="dialog-body">
+      <div class="dialog-title"><div><p class="eyebrow">PROFIL</p><h2>Parametry i cel</h2></div><button type="button" class="close" data-close="profileDialog" aria-label="Zamknij">×</button></div>
+      <div class="form-grid"><label>Wiek (lata)<input name="age" type="number" min="19" max="100" required></label><label>Wzrost (cm)<input name="height" type="number" min="120" max="230" step="0.1" required></label><label>Masa (kg)<input name="weight" type="number" min="30" max="350" step="0.1" required></label><label>Aktywność (PAL)<select name="pal"><option value="1.4">Niska · 1,4</option><option value="1.6" selected>Umiarkowana · 1,6</option><option value="1.8">Aktywna · 1,8</option><option value="2">Bardzo aktywna · 2,0</option></select></label><label>Cel<select name="goal"><option value="0">Utrzymanie</option><option value="5">Deficyt 5%</option><option value="10" selected>Deficyt 10%</option><option value="15">Deficyt 15%</option><option value="20">Deficyt 20%</option></select></label></div>
+      <p class="muted small-note">Szacunek REE obliczany wzorem Henry’ego z polskich Norm żywienia 2024; TDEE = REE × PAL. Wartość jest estymacją, nie pomiarem medycznym.</p>
+      <p id="profileError" class="error"></p><div class="dialog-actions"><button type="button" class="secondary" data-close="profileDialog">Anuluj</button><button class="primary" type="submit">Zapisz profil</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="dialog wide">
+    <div class="dialog-body">
+      <div class="dialog-title"><div><p class="eyebrow">USTAWIENIA</p><h2>Dane, katalog i integracje</h2></div><button type="button" class="close" data-close="settingsDialog">×</button></div>
+      <section class="settings-section"><h3>Wyszukiwanie online</h3><p class="muted">Sekrety FatSecret są przechowywane wyłącznie w Cloudflare Worker. W przeglądarce zapisujesz tylko jego publiczny adres.</p><label>Adres Cloudflare Worker<input id="workerUrl" type="url" placeholder="https://twoj-worker.workers.dev"></label><div class="settings-row"><button id="saveWorker" class="secondary">Zapisz adres</button><button id="testWorker" class="outline">Testuj połączenie</button></div><p id="workerStatus" class="muted" aria-live="polite">Worker nie został jeszcze sprawdzony.</p><p class="small-note">Dodawanie produktów FatSecret do trwałego dziennika jest domyślnie wyłączone. Włącz tę możliwość przez sekret FATSECRET_STORAGE_ALLOWED=true wyłącznie po uzyskaniu odpowiednich praw przechowywania danych od FatSecret.</p><p class="small-note">Wybór FatSecret wywołuje wyłącznie FatSecret; Open Food Facts uruchamia się tylko po wybraniu OFF lub „Oba źródła”.</p></section>
+      <section class="settings-section"><h3>Zapisana baza produktów</h3><p class="muted">Importuj plik <code>.jsonl.gz</code> utworzony skryptem z paczki. Plik może ważyć kilkaset MB lub więcej — import odbywa się lokalnie w przeglądarce.</p><div class="settings-row"><label class="file-button">Wybierz i importuj katalog<input type="file" id="catalogFile" accept=".jsonl,.ndjson,.gz,application/gzip"></label><button id="clearCatalog" class="outline">Usuń zaimportowaną bazę</button></div><p id="catalogInfo" class="muted">Sprawdzanie lokalnej bazy…</p><progress id="importProgress" max="100" value="0"></progress><p id="importStatus" class="small-note" aria-live="polite"></p></section>
+      <section class="settings-section"><h3>Kopia zapasowa</h3><div class="settings-row"><button id="exportBackup" class="outline">Eksportuj JSON</button><label class="file-button">Importuj JSON<input type="file" id="importBackup" accept="application/json,.json"></label></div></section>
+      <div class="dialog-actions"><button type="button" class="primary" data-close="settingsDialog">Zamknij</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="productDialog" class="dialog">
+    <form id="productForm" method="dialog" class="dialog-body">
+      <div class="dialog-title"><div><p class="eyebrow">TWOJA BAZA</p><h2>Własny produkt</h2></div><button type="button" class="close" data-close="productDialog">×</button></div>
+      <div class="form-grid"><label>Nazwa<input name="name" required maxlength="100"></label><label>Marka<input name="brand" maxlength="80"></label><label>Sklep<select name="store"><option>Ogólne</option><option>Lidl</option><option>Biedronka</option><option>Kaufland</option><option>Carrefour</option></select></label><label>Kcal / 100 g<input name="kcal" type="number" min="0" max="950" step="0.1" required></label><label>Białko / 100 g<input name="protein" type="number" min="0" max="100" step="0.1"></label><label>Tłuszcz / 100 g<input name="fat" type="number" min="0" max="100" step="0.1"></label><label>Węglowodany / 100 g<input name="carbs" type="number" min="0" max="100" step="0.1"></label><label>Typowa sztuka (g)<input name="unitWeight" type="number" min="0.1" max="10000" step="0.1" placeholder="np. banan 120"></label></div>
+      <p class="muted small-note">Wpisuj wartości z etykiety produktu lub wiarygodnego źródła.</p><p id="productError" class="error"></p><div class="dialog-actions"><button type="button" class="secondary" data-close="productDialog">Anuluj</button><button class="primary" type="submit">Zapisz produkt</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="recipeDialog" class="dialog wide">
+    <form id="recipeForm" method="dialog" class="dialog-body recipe-editor">
+      <div class="dialog-title"><div><p class="eyebrow">KREATOR DAŃ</p><h2 id="recipeDialogTitle">Nowy przepis</h2><p class="muted">Składniki zapiszesz raz, a potem wykorzystasz w dowolnym planie tygodnia.</p></div><button type="button" class="close" data-close="recipeDialog">×</button></div>
+      <div class="recipe-editor-top"><label>Nazwa dania<input name="name" required maxlength="100" placeholder="np. Makaron z kurczakiem"></label><div class="form-grid recipe-meta-grid"><label>Liczba porcji<input name="portions" type="number" min="1" max="30" value="1" required></label><label>Typ posiłku<select name="meal"><option>Śniadanie</option><option>II śniadanie</option><option selected>Obiad</option><option>Podwieczorek</option><option>Kolacja</option></select></label></div></div>
+      <div class="recipe-head"><div><b>Składniki</b><small>Wybierz produkt z katalogu albo wpisz własną wartość kcal / 100 g.</small></div><button type="button" id="addIngredient" class="secondary">＋ Dodaj składnik</button></div>
+      <div id="ingredientRows"></div>
+      <div class="recipe-sum"><span>Całe danie <b id="recipeTotal">0 kcal</b></span><span>Na porcję <b id="recipePortion">0 kcal</b></span></div>
+      <div class="recipe-notes-grid"><label>Opis (opcjonalnie)<textarea name="description" rows="2" maxlength="500" placeholder="Krótki opis dania…"></textarea></label><label>Przygotowanie (opcjonalnie)<textarea name="instructions" rows="3" maxlength="2500" placeholder="1. Przygotuj składniki…&#10;2. …"></textarea></label></div>
+      <p id="recipeError" class="error"></p><div class="dialog-actions"><button type="button" class="secondary" data-close="recipeDialog">Anuluj</button><button type="submit" id="recipeSubmit" class="primary">Zapisz przepis</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="planDialog" class="dialog wide">
+    <form id="planForm" method="dialog" class="dialog-body plan-editor">
+      <div class="dialog-title"><div><p class="eyebrow">KREATOR PLANU</p><h2 id="planDialogTitle">Nowy plan tygodniowy</h2><p class="muted">Wybieraj wyłącznie przepisy zapisane w zakładce „Moje przepisy”.</p></div><button type="button" class="close" data-close="planDialog">×</button></div>
+      <div class="form-grid plan-meta-grid"><label>Nazwa planu<input name="title" required maxlength="90" placeholder="np. Tydzień lekkich obiadów"></label><label>Data rozpoczęcia<input name="startDate" type="date" required></label></div>
+      <div class="plan-assignment-head"><div><b>Rozpiska posiłków</b><small>Dodaj przepis do dnia, wybierz posiłek i liczbę porcji.</small></div><button id="addPlanAssignment" type="button" class="secondary">＋ Dodaj posiłek</button></div>
+      <div id="planAssignments" class="plan-assignment-list"></div>
+      <p id="planError" class="error"></p>
+      <div class="dialog-actions"><button type="button" class="secondary" data-close="planDialog">Anuluj</button><button type="submit" class="primary" id="planSubmit">Zapisz plan</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="aboutDialog" class="dialog wide">
+    <div class="dialog-body"><div class="dialog-title"><h2>Informacje i źródła danych</h2><button type="button" class="close" data-close="aboutDialog">×</button></div><p><b>To narzędzie do samoobserwacji, nie porada medyczna.</b> REE jest szacowane równaniami Henry’ego opisanymi w polskich Normach żywienia 2024. TDEE = REE × PAL. Wartości nie są pomiarem metabolizmu.</p><p>BMI jest wskaźnikiem przesiewowym WHO i nie ocenia składu ciała. Deficyty są scenariuszami matematycznymi, a nie zaleceniami WHO/NFZ. Przy chorobach, ciąży, laktacji lub zaburzeniach odżywiania skonsultuj cel ze specjalistą.</p><p>Katalog startowy zawiera 1255 pozycji: produkty ogólne oraz orientacyjne warianty przygotowania. Nie są to oficjalne karty SKU Lidla, Biedronki, Kauflandu ani Carrefour; wartości dla obróbki termicznej są estymacjami zależnymi od receptury. Pozycja „Bułka słodka drożdżowa” ma osobne źródło DTU Frida, food ID 1334 (296 kcal/100 g). Dla produktu pakowanego nadrzędna jest etykieta konkretnego opakowania. Opcjonalny import OFF uzupełnia bazę produktami oznaczonymi przez społeczność.</p><p>Oficjalna baza PZH zawiera ponad tysiąc pozycji, ale jest udostępniana na podstawie umowy licencyjnej. Dane sieciowe z dokładnymi nazwami i kodami kreskowymi najlepiej dodawać z etykiet lub importować z licencjonowanego źródła.</p><ul><li><a href="https://ncez.pzh.gov.pl/abc-zywienia/zasady-zdrowego-zywienia/normy-zywieniowe-2024/" target="_blank" rel="noopener">NIZP PZH — Normy żywienia 2024</a></li><li><a href="https://www.who.int/news-room/fact-sheets/detail/obesity-and-overweight" target="_blank" rel="noopener">WHO — BMI</a></li><li><a href="https://world.openfoodfacts.org/" target="_blank" rel="noopener">Open Food Facts — ODbL / DBCL</a></li><li><a href="https://www.pzh.gov.pl/uslugi/tabele-wartosci-odzywczej-produktow/" target="_blank" rel="noopener">NIZP PZH — tabele wartości odżywczej</a></li><li><a href="https://frida.fooddata.dk/index.php/food/1334?lang=en" target="_blank" rel="noopener">DTU Frida — bułka słodka, food ID 1334 (CC BY 4.0)</a></li><li><a href="https://platform.fatsecret.com/terms" target="_blank" rel="noopener">FatSecret — warunki API</a></li></ul><p>Wyniki FatSecret są traktowane jako dane online i nie są dodawane do lokalnej bazy produktów. Warunki wykorzystania danych w dzienniku wymagają potwierdzenia z FatSecret.</p><button type="button" class="primary" data-close="aboutDialog">Zamknij</button></div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+  <script>if('serviceWorker' in navigator && location.protocol.startsWith('http')) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
+</body>
+</html>
