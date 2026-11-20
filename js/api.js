@@ -27,10 +27,10 @@ export async function searchOnline({query,source,workerUrl,force=false}){
   const q=String(query||'').trim();
   if(q.length<2)throw new Error('Wpisz co najmniej 2 znaki.');
   if(!['fatsecret','off','all'].includes(source))throw new Error('Nieznane źródło danych.');
-  if(!workerUrl)throw new Error('Ustaw adres Cloudflare Worker w Ustawieniach.');
+  if(!workerUrl)throw new Error('Ustaw adres serwera w Ustawieniach.');
   const base=workerUrl.replace(/\/+$/,'');
-  let url; try{url=new URL(base);}catch{throw new Error('Adres Worker nie jest prawidłowym adresem URL.');}
-  if(url.protocol!=='https:' && url.hostname!=='localhost')throw new Error('Worker musi używać HTTPS.');
+  let url; try{url=new URL(base);}catch{throw new Error('Adres serwera nie jest prawidłowy.');}
+  if(url.protocol!=='https:' && url.hostname!=='localhost')throw new Error('Adres serwera musi zaczynać się od https://.');
   const key=`${base}|${source}|${normalizeText(q)}`;
   if(!force){const cached=memoryCache.get(key);if(cached&&Date.now()-cached.at<API_CACHE_TTL_MS)return {...cached.value,cached:true};}
   if(inFlight.has(key))return inFlight.get(key);
@@ -38,9 +38,9 @@ export async function searchOnline({query,source,workerUrl,force=false}){
     const endpoint=new URL('/api/search',base);
     endpoint.searchParams.set('q',q);endpoint.searchParams.set('source',source);endpoint.searchParams.set('limit','30');
     const response=await fetch(endpoint.toString(),{method:'GET',headers:{Accept:'application/json'},signal:AbortSignal.timeout?AbortSignal.timeout(25000):undefined});
-    const body=await response.json().catch(()=>({error:'Serwer zwrócił nieprawidłową odpowiedź JSON.'}));
-    if(!response.ok)throw new Error(body.error||`Błąd API (${response.status}).`);
-    if(body.apiVersion && body.apiVersion!==API_VERSION)throw new Error(`Nieaktualna wersja Worker (${body.apiVersion}). Wdróż wersję ${API_VERSION}.`);
+    const body=await response.json().catch(()=>({error:'Serwer zwrócił nieprawidłową odpowiedź.'}));
+    if(!response.ok)throw new Error(body.error||`Błąd serwera (${response.status}).`);
+    if(body.apiVersion && body.apiVersion!==API_VERSION)throw new Error(`Nieaktualna wersja serwera (${body.apiVersion}). Zaktualizuj serwer do wersji ${API_VERSION}.`);
     const requested=source==='all'?['fatsecret','off']:[source];
     const missing=requested.filter(s=>body.sources?.[s]?.status!=='ok');
     const results=[];
@@ -60,10 +60,10 @@ export async function searchOnline({query,source,workerUrl,force=false}){
 }
 
 export async function checkWorker(workerUrl){
-  if(!workerUrl)throw new Error('Najpierw wpisz adres Worker.');
+  if(!workerUrl)throw new Error('Najpierw wpisz adres serwera.');
   const response=await fetch(workerUrl.replace(/\/+$/,'')+'/health',{headers:{Accept:'application/json'}});
   const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(body.error||`Worker zwrócił HTTP ${response.status}.`);
-  if(body.apiVersion!==API_VERSION)throw new Error(`Wersja Worker jest nieaktualna: ${body.apiVersion||'brak'}. Oczekiwana: ${API_VERSION}.`);
+  if(!response.ok)throw new Error(body.error||`Serwer zwrócił błąd (kod ${response.status}).`);
+  if(body.apiVersion!==API_VERSION)throw new Error(`Wersja serwera jest nieaktualna: ${body.apiVersion||'brak'}. Oczekiwana: ${API_VERSION}.`);
   return body;
 }

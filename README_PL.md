@@ -1,6 +1,6 @@
 # Dziennik Żywieniowy
 
-Responsywna aplikacja do dziennego monitorowania kalorii, produktów, gramatur, masy ciała, nawodnienia, jadłospisu tygodniowego i własnych przepisów. Zbudowana w czystym HTML, CSS i JavaScript (ES modules), bez frameworka i bez procesu build. Gotowa do hostowania na GitHub Pages.
+Responsywna aplikacja do dziennego monitorowania kalorii, produktów, gramatur, masy ciała, nawodnienia, jadłospisu tygodniowego, bazy dań i własnych dań. Zbudowana w czystym HTML, CSS i JavaScript (ES modules), bez frameworka i bez procesu build. Gotowa do hostowania na GitHub Pages.
 
 ## Co zawiera paczka
 
@@ -11,7 +11,9 @@ Responsywna aplikacja do dziennego monitorowania kalorii, produktów, gramatur, 
 - `docs/FATSECRET_SETUP.md` — rejestracja, bezpłatne plany, limity i konfiguracja FatSecret.
 - `docs/OPEN_FOOD_FACTS_SETUP.md` — konto, API, eksporty, limity i licencje OFF.
 - `docs/BAZA_LOKALNA_OFF.md` — pełna instrukcja aktualizacji katalogu i importu w aplikacji.
-- `docs/KATALOG_STARTOWY.md` — opis katalogu startowego (1189 pozycji), pochodzenia i ograniczeń dokładności.
+- `docs/KATALOG_STARTOWY.md` — opis katalogu (1189 produktów ogólnych + 351 produktów sklepowych) i bazy dań, pochodzenia i ograniczeń dokładności.
+- `js/store-products.js`, `js/store-products-biedronka.js` — katalog sklepowy: 169 produktów Biedronki z oficjalnych kart oraz 182 pozycje Lidla i Kauflanda (pieczywo, mięso, wędliny, nabiał).
+- `js/seed-dishes.js` — 157 dań: 89 domowych i 68 fast food (McDonald’s, KFC, Popeyes, Burger King).
 - `js/firebase-config.js`, `js/firebase-sync.js`, `firestore.rules` — logowanie e-mail/hasło i synchronizacja danych per konto.
 - `tests/` — testy bez prawdziwych kluczy API.
 
@@ -23,17 +25,18 @@ W aplikacji wybierasz jedną z dwóch ścieżek:
 
 Aplikacja szuka w:
 
-1. 1189 wbudowanych pozycji referencyjnych (produkty bazowe, warianty przygotowania i codzienne produkty sklepowe, w tym wiele rodzajów pieczywa);
-2. produktach własnych, które dodasz w aplikacji;
-3. lokalnym katalogu Open Food Facts zaimportowanym do IndexedDB.
+1. 1189 wbudowanych produktów ogólnych (produkty bazowe i warianty przygotowania);
+2. 351 produktów sklepowych: 169 z oficjalnych kart Biedronki oraz 182 pozycje Lidla i Kauflanda;
+3. produktach własnych, które dodasz w aplikacji;
+4. lokalnym katalogu Open Food Facts zaimportowanym do IndexedDB.
 
 Zapisany katalog działa offline po zaimportowaniu. Jest związany z daną przeglądarką i urządzeniem — GitHub Pages nie hostuje ani nie synchronizuje automatycznie jego zawartości.
 
 ### Katalog startowy bez pobierania dużych plików
 
-Wbudowany katalog w jednym pliku `js/seed-products.js` zawiera 1189 pozycji: bazowe produkty codzienne oraz orientacyjne warianty przygotowania (np. gotowane, pieczone, grillowane, opiekane). Działa offline i nie wymaga importu dużego pliku. To wartości referencyjne dla produktów ogólnych, nie oficjalne karty SKU czterech sieci. Wyszukiwanie „bułka” zwraca szeroki wybór pieczywa. Wartości wariantów technologicznych są szacunkowe i zależą od receptury oraz utraty/przyrostu wody i tłuszczu. Przy produktach pakowanych nadrzędne są wartości z etykiety konkretnego opakowania. Pełny opis źródeł i ograniczeń znajdziesz w [`docs/KATALOG_STARTOWY.md`](docs/KATALOG_STARTOWY.md).
+Wbudowany katalog ma dwa poziomy. `js/seed-products.js` zawiera 1189 produktów ogólnych i wariantów przygotowania. `js/store-products.js` dodaje 351 pozycji sklepowych: 169 produktów Biedronki z oficjalnych kart (na 100 g/ml, z linkiem do źródła) oraz 182 pozycje Lidla i Kauflandu: 123 produkty Lidla (pieczywo, mięso, wędliny, nabiał) i 59 Kauflandu (pieczywo, mięso, wędliny, nabiał). Lidl i Kaufland nie publikują pełnych tabel odżywczych na tych kartach, więc ich wartości są orientacyjne i oznaczone w aplikacji. Wyszukiwanie „bułka” zwraca szeroki wybór pieczywa, a frazy „schab”, „twaróg” lub „mleko” — pozycje mięsne i nabiałowe; filtr sklepu zawęża bazę. Przy produktach pakowanych nadrzędne są wartości z etykiety konkretnego opakowania. Pełny opis źródeł i ograniczeń znajdziesz w [`docs/KATALOG_STARTOWY.md`](docs/KATALOG_STARTOWY.md).
 
-Aplikacja ma cztery zakładki: **Dziennik**, **Plan tygodnia**, **Moje przepisy** i **Produkty**. Wszystkie ikony to jeden wbudowany sprite SVG (`index.html`), a dziennik pokazuje przy każdym wpisie i w podsumowaniu posiłku białko, tłuszcze i węglowodany wraz z udziałem energii (4/9/4 kcal na gram). Posiłki dodajesz do dnia wyłącznie w zakładce „Dziennik” — kartą „Dodaj produkt/danie/dzień”, która obsługuje pojedynczy produkt, zapisane danie z przepisów oraz wybrany dzień z własnego planu. Zakładka „Produkty” zawiera cały katalog startowy (tylko odczyt) oraz dodawanie, edycję i usuwanie własnych produktów. Pełny opis zależności między produktem, posiłkiem, daniem i planem: [`docs/FLOW.md`](docs/FLOW.md).
+Aplikacja ma cztery zakładki: **Dziennik**, **Plan tygodnia**, **Dania** i **Produkty**. Zakładka **Dania** zawiera 157 pozycji: 89 dań domowych oraz 68 pozycji McDonald’s, KFC, Popeyes i Burger King, w tym pięć wariantów Burgera Drwala. Bazę dań można przeglądać bez tworzenia własnych pozycji; własne dania są edytowalne. Wszystkie ikony to jeden wbudowany sprite SVG (`index.html`), a dziennik pokazuje przy każdym wpisie i w podsumowaniu posiłku białko, tłuszcze i węglowodany wraz z udziałem energii (4/9/4 kcal na gram). Posiłki dodajesz do dnia wyłącznie w zakładce „Dziennik” — kartą „Dodaj produkt/danie/dzień”, która obsługuje pojedynczy produkt, danie z bazy lub własne oraz wybrany dzień z własnego planu. Zakładka „Produkty” łączy katalog startowy i własne produkty w jednej liście; filtr „Źródło” pozwala pokazać tylko własne pozycje lub wybraną sieć, a własne produkty można edytować i usuwać. Pełny opis zależności między produktem, posiłkiem, daniem i planem: [`docs/FLOW.md`](docs/FLOW.md).
 
 Pierwsze uruchomienie wymaga uzupełnienia **obu profili jednocześnie** — kobiety i mężczyzny. Jeżeli aktualizacja zastanie zapisany tylko jeden profil, kreator poprosi o brakujące parametry i pokaże istniejący profil do weryfikacji.
 
@@ -47,9 +50,9 @@ Pierwsze uruchomienie wymaga uzupełnienia **obu profili jednocześnie** — kob
 
 Nie ma cichego fallbacku z FatSecret do OFF. Jeżeli FatSecret zwróci błąd lub nie ma dostępu do regionu PL, aplikacja pokaże jego błąd zamiast odpytania innego dostawcy. Standardowo wyniki FatSecret są tylko do podglądu; dodawanie ich do trwałego dziennika wymaga osobnych praw data-storage i opt-in w Worker. W statusie wyszukiwania pokazane jest, jakie źródło rzeczywiście odpowiedziało.
 
-### Czy da się pobrać pełną bazę wszystkich czterech sieci?
+### Czy da się pobrać pełną bazę wszystkich sklepów?
 
-Nie znalazłem oficjalnego, publicznego eksportu pełnego asortymentu SKU Lidla, Biedronki, Kauflandu i Carrefour. FatSecret nie dokumentuje publicznego eksportu całej bazy i ogranicza bezterminowe przechowywanie danych z API. Bezpłatne Basic i Premier Free standardowo udostępniają dataset USA; rynek PL należy uzgodnić osobno (szczegóły: `docs/FATSECRET_SETUP.md`).
+Nie ma oficjalnego, publicznego eksportu pełnego asortymentu SKU Lidla, Biedronki i Kauflanda (Carrefour pozostaje w katalogu ogólnym). FatSecret nie dokumentuje publicznego eksportu całej bazy i ogranicza bezterminowe przechowywanie danych z API. Bezpłatne Basic i Premier Free standardowo udostępniają dataset USA; rynek PL należy uzgodnić osobno (szczegóły: `docs/FATSECRET_SETUP.md`).
 
 Open Food Facts umożliwia pobranie dużego eksportu produktów. Dołączony skrypt filtruje polskie rekordy, dla których rozpoznano jedną z sieci (pole sklepu lub rozpoznawana marka własna) i które mają wartość kcal / 100 g. To najlepsza dostępna ścieżka do własnej, zapisanej bazy, ale nie może zagwarantować pełnej listy SKU: dane OFF są społecznościowe, etykiety sklepów bywają niepełne, a asortyment się zmienia.
 
@@ -141,7 +144,7 @@ Cache: aplikacja przechowuje wyniki wyszukiwania online w pamięci bieżącej ka
 
 ## 6. Firebase — wymagane logowanie i synchronizacja per konto
 
-Aplikacja wymaga zalogowania przez e-mail i hasło. Firebase Auth zapamiętuje sesję w przeglądarce (`browserLocalPersistence`); aplikacja nie zapisuje hasła. Każde konto ma oddzielne dzienniki i wspólną w ramach konta bazę własnych produktów, przepisów oraz planów tygodniowych.
+Aplikacja wymaga zalogowania przez e-mail i hasło. Firebase Auth zapamiętuje sesję w przeglądarce (`browserLocalPersistence`); aplikacja nie zapisuje hasła. Każde konto ma oddzielne dzienniki i wspólną w ramach konta bazę własnych produktów, dań oraz planów tygodniowych.
 
 Wykonaj instrukcję krok po kroku w [`docs/FIREBASE_LOGOWANIE.md`](docs/FIREBASE_LOGOWANIE.md): utwórz projekt, zarejestruj Web App, uzupełnij `js/firebase-config.js`, włącz Email/Password, dodaj domenę GitHub Pages do Authorized domains, utwórz Firestore i opublikuj `firestore.rules`.
 
@@ -160,7 +163,7 @@ Aplikacja nie wymaga npm, bundlera ani backendu do działania z lokalną bazą. 
 
 ## 8. Znane ograniczenia
 
-- 100% kompletności SKU czterech sieci nie da się zagwarantować na podstawie publicznych danych OFF. Produkty piekarni, lady mięsnej, krótkie oferty i produkty bez danych sklepów/brandów mogą nie zostać rozpoznane.
+- 100% kompletności SKU trzech sieci nie da się zagwarantować na podstawie publicznych danych. Biedronka ma oficjalne wartości dla 169 pozycji; Lidl i Kaufland mają nazwy pieczywa, mięsa, wędlin i nabiału, ale wartości orientacyjne. Asortyment i menu fast food zmieniają się regionalnie. Produkty piekarni, lady mięsnej, krótkie oferty i produkty bez danych sklepów/brandów mogą nie zostać rozpoznane.
 - Katalog może zawierać błędne lub niekompletne dane żywieniowe; porównuj je z etykietą konkretnego opakowania.
 - Online search wymaga dostępności zewnętrznego dostawcy i skonfigurowanego Worker. Status FatSecret nie potwierdza prawa do regionu PL — to określa umowa/uprawnienia konta.
 - Dane FatSecret nie są importowane do zapisanej bazy. Domyślnie aplikacja blokuje dodanie produktu FatSecret do trwałego dziennika. Można odblokować zapis przez `FATSECRET_STORAGE_ALLOWED=true` dopiero po uzyskaniu zgody/licencji na trwałe przechowywanie danych od FatSecret.

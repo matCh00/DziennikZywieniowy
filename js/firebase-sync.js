@@ -5,7 +5,7 @@ export function firebaseConfigured(config){
 // Firebase Auth LOCAL persistence remembers the session on this browser/device.
 // Passwords are handled only by Firebase Auth and are never written to app storage.
 export async function initFirebaseClient(config){
-  if(!firebaseConfigured(config)) throw new Error('Firebase nie jest skonfigurowany. Uzupełnij js/firebase-config.js.');
+  if(!firebaseConfigured(config)) throw new Error('Logowanie nie jest skonfigurowane. Skontaktuj się z administratorem aplikacji.');
   const [appMod,authMod,firestoreMod]=await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js'),

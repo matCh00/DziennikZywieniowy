@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#315e65">
   <title>Regulamin i źródła danych — Dziennik Żywieniowy</title>
   <style>
@@ -16,10 +16,10 @@
     <p>Dziennik Żywieniowy jest narzędziem do osobistej samoobserwacji żywieniowej. Nie jest usługą medyczną, diagnozą ani poradą dietetyczną. Użytkownik sam odpowiada za sprawdzanie produktów, gramatur i wartości z etykiety.</p>
 
     <h2>1. Kalkulatory</h2>
-    <p>REE jest wartością szacunkową obliczaną równaniami Henry’ego opisanymi w polskich Normach żywienia 2024 NIZP PZH–PIB. TDEE to REE pomnożone przez PAL. BMI jest wskaźnikiem przesiewowym, a nie oceną składu ciała. Wartości celu redukcyjnego w aplikacji są scenariuszami matematycznymi, a nie zaleceniami WHO, NFZ lub PZH.</p>
+    <p>REE (spoczynkowy wydatek energetyczny) to energia, którą organizm zużywa w spoczynku; jest szacowany równaniami Henry’ego opisanymi w polskich Normach żywienia 2024 NIZP PZH–PIB. TDEE (całkowity wydatek energetyczny) to REE pomnożone przez PAL — poziom aktywności fizycznej w skali 1,4–2,0 wg EFSA, przyjętej w Normach żywienia 2024. BMI (wskaźnik masy ciała) to stosunek masy ciała do kwadratu wzrostu; jest wskaźnikiem przesiewowym, a nie oceną składu ciała. Wartości celu redukcyjnego w aplikacji są scenariuszami matematycznymi, a nie zaleceniami WHO, NFZ lub PZH.</p>
 
     <h2>2. Produkty i jakość danych</h2>
-    <p>Katalog lokalny zawiera wartości generyczne i orientacyjne. Importowany katalog Open Food Facts jest niezależną bazą pochodną, która musi być udostępniana zgodnie z ODbL. Dane online mogą pochodzić z Open Food Facts lub FatSecret. Produkty FatSecret są domyślnie dostępne wyłącznie do podglądu, a trwały zapis jest blokowany do czasu uzyskania osobnych praw do przechowywania danych. Brak gwarancji, że dane są kompletne, aktualne, zgodne z konkretną partią lub etykietą sklepową. Użytkownik powinien weryfikować informacje na opakowaniu. Własne wartości wpisuje sam użytkownik.</p>
+    <p>Katalog lokalny zawiera 1189 produktów ogólnych oraz 351 produktów sklepowych. Pozycje Biedronki (169) korzystają z oficjalnych kart produktów i mają link do źródła. Lidl (123) i Kaufland (59) mają nazwy z oficjalnych stron asortymentu — pieczywo, mięso, wędliny i nabiał — ale sklepy nie publikują tam pełnych tabel wartości odżywczych. Wartości tych pozycji są orientacyjne i wyraźnie oznaczone. Baza dań zawiera 89 dań domowych (szacunki typowych porcji) oraz 68 pozycji fast food z oficjalnych tabel McDonald’s, KFC, Burger King i Popeyes; menu może się zmieniać regionalnie. Importowany katalog Open Food Facts jest niezależną bazą pochodną, która musi być udostępniana zgodnie z ODbL. Produkty FatSecret są domyślnie dostępne wyłącznie do podglądu, a trwały zapis jest blokowany do czasu uzyskania osobnych praw do przechowywania danych. Brak gwarancji, że dane są kompletne, aktualne lub zgodne z konkretną partią. Użytkownik powinien weryfikować informacje na opakowaniu. Własne wartości wpisuje sam użytkownik.</p>
     <p>Open Food Facts jest bazą współtworzoną przez społeczność. Baza jest udostępniana na licencji ODbL, a zdjęcia podlegają odrębnym licencjom. Więcej: <a href="https://openfoodfacts.github.io/openfoodfacts-server/api/" target="_blank" rel="noopener">dokumentacja Open Food Facts</a> i <a href="https://world.openfoodfacts.org/data" target="_blank" rel="noopener">eksport danych</a>.</p>
 
     <h2>3. Warunki FatSecret</h2>
@@ -30,7 +30,7 @@
     <p>Produkty importowane z Open Food Facts pochodzą z bazy udostępnianej na ODbL; rekordy i zdjęcia mogą podlegać odrębnym licencjom. Publiczne rozpowszechnianie katalogu pochodnego wymaga sprawdzenia obowiązków atrybucji i udostępniania bazy pochodnej. Zobacz <a href="https://openfoodfacts.github.io/openfoodfacts-server/api/tutorials/license-be-on-the-legal-side/" target="_blank" rel="noopener">oficjalne wyjaśnienie licencji OFF</a>. FatSecret nie jest importowany do miesięcznego katalogu lokalnego.
 
     <h2>5. Dane osobowe i synchronizacja</h2>
-    <p>Profile, dzienniki, masa ciała, własne produkty, plany i przepisy są przypisane do konta użytkownika Firebase Authentication (e-mail/hasło) i synchronizowane z Firestore. Sesja logowania jest utrzymywana przez Firebase w pamięci przeglądarki; aplikacja nie zapisuje hasła. Lokalny cache aplikacji jest rozdzielany według identyfikatora UID konta. Dane profilu kobiety i mężczyzny są osobne, natomiast własne produkty, plany i przepisy są współdzielone w ramach jednego konta. Wyloguj się na urządzeniu współdzielonym i eksportuj kopie bezpieczeństwa.</p>
+    <p>Profile, dzienniki, masa ciała, własne produkty, plany i dania są przypisane do konta użytkownika Firebase Authentication (e-mail/hasło) i synchronizowane z Firestore. Sesja logowania jest utrzymywana przez Firebase w pamięci przeglądarki; aplikacja nie zapisuje hasła. Lokalny cache aplikacji jest rozdzielany według identyfikatora UID konta. Dane profilu kobiety i mężczyzny są osobne, natomiast własne produkty, plany i dania są współdzielone w ramach jednego konta. Wyloguj się na urządzeniu współdzielonym i eksportuj kopie bezpieczeństwa.</p>
 
     <h2>6. Bezpieczeństwo i ograniczenia</h2>
     <ul>

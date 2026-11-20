@@ -1,8 +1,12 @@
 # Przepływ danych w Dzienniku Żywieniowym
 
 Dokument opisuje, jak aplikacja łączy **produkt → posiłek → dzień → danie → plan**.
-Opis dotyczy wersji z jednym plikiem katalogu startowego (`js/seed-products.js`,
-wersja danych `2026-11-20.1`) i czwartą zakładką „Produkty”.
+Opis dotyczy wersji z katalogiem ogólnym (`js/seed-products.js`), katalogiem sklepowym
+(`js/store-products.js`) i bazą dań (`js/seed-dishes.js`).
+
+**Terminologia:** interfejs używa nazwy **„Dania”**. W kodzie i w Firestore nadal
+występuje historyczna nazwa `recipes` / `state.recipes` — to techniczna nazwa magazynu
+własnych dań, zachowana dla zgodności zapisanych danych.
 
 ---
 
@@ -203,8 +207,9 @@ Wpisy w dzienniku pozostają nietknięte (są kopiami).
   Open Food Facts z IndexedDB.
 - Tryb „Wyszukiwanie online”: FatSecret / Open Food Facts / oba przez Cloudflare Worker.
 - Wyniki FatSecret bez zgody `data-storage` są tylko do podglądu.
-- Zakładka „Produkty” pokazuje cały katalog startowy (paginacja) i produkty własne;
-  „＋ Użyj w dzienniku” przenosi do „Dziennika” z wybranym produktem, ale **nie dodaje**
+- Zakładka „Produkty” pokazuje katalog startowy i produkty własne w jednej liście
+  (paginacja); filtr „Źródło” zawęża ją do własnych pozycji lub wybranej sieci.
+  „＋ Dodaj do dziennika” przenosi do „Dziennika” z wybranym produktem, ale **nie dodaje**
   wpisu — dodanie zawsze wymaga akcji w karcie dziennika.
 
 ---

@@ -36,10 +36,10 @@ Każde konto ma własną przestrzeń `users/{uid}/appData/`:
 
 - `profile_female` — parametry kobiety, jej dzienniki i historia masy ciała;
 - `profile_male` — parametry mężczyzny, jego dzienniki i historia masy ciała;
-- `shared` — własne produkty, przepisy i plany tygodniowe, wspólne dla obu zakładek płci w ramach jednego konta;
+- `shared` — własne produkty, dania i plany tygodniowe, wspólne dla obu zakładek płci w ramach jednego konta;
 - `preferences` — aktywny profil, ustawienia katalogu i adres Cloudflare Worker.
 
-Dane różnych kont są od siebie odseparowane. Własne produkty, przepisy i plany są współdzielone między profilem kobiety i mężczyzny **na tym samym koncie**, nie między różnymi kontami.
+Dane różnych kont są od siebie odseparowane. Własne produkty, dania i plany są współdzielone między profilem kobiety i mężczyzny **na tym samym koncie**, nie między różnymi kontami.
 
 Dla kompatybilności przy pierwszym logowaniu aplikacja wykrywa poprzedni, anonimowy zapis `dziennik-zywieniowy-v3` w przeglądarce i pyta, czy przenieść go na pierwsze zalogowane konto. Migracja jest opcjonalna. Po niej lokalny cache jest zapisywany pod kluczem zawierającym UID konta.
 

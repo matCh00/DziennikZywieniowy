@@ -2,13 +2,17 @@
 
 ## Zawartość
 
-Aplikacja zawiera **1189 lekkich pozycji startowych** w jednym pliku `js/seed-products.js` (produkty bazowe, warianty przygotowania oraz codzienne produkty sklepowe). Katalog obejmuje codzienne kategorie: owoce, warzywa, pieczywo, różne rodzaje bułek, produkty zbożowe, nabiał, jaja, mięso, ryby, rośliny strączkowe, konserwy, tłuszcze, sosy, orzechy, słodycze, dania gotowe i napoje. Plik z danymi waży kilkadziesiąt kilobajtów, więc nie wymaga pobierania wielogigabajtowego eksportu.
+Aplikacja ma **1189 produktów ogólnych** w `js/seed-products.js` oraz **351 produktów sklepowych** w `js/store-products.js` i `js/store-products-biedronka.js`. Katalog ogólny obejmuje codzienne kategorie: owoce, warzywa, pieczywo, bułki, produkty zbożowe, nabiał, jaja, mięso, ryby, strączki, konserwy, tłuszcze, sosy, orzechy, słodycze, dania gotowe i napoje. Katalog sklepowy zawiera 169 pozycji Biedronki z oficjalnych kart produktów (z linkiem i wartościami na 100 g/ml) oraz 182 pozycje Lidla i Kauflandu z oficjalnych stron asortymentu: 123 produkty Lidla (63 pieczywo, 16 mięso, 15 wędlin, 29 nabiał) i 59 Kauflandu (14 pieczywo, 20 mięso, 8 wędlin, 17 nabiał). Lidl i Kaufland nie udostępniają tam pełnych tabel, więc ich wartości są orientacyjne i oznaczone `retailer-assortment-reference`.
+
+Mięso i nabiał Lidla pochodzą z oficjalnych stron marki Rzeźnik, Pikok i Pilos. Kaufland korzysta z oficjalnego leksykonu mięsa, wędlin oraz produktów mlecznych i jajek. Nazwy są zgodne z tymi stronami; wartości odżywcze są referencyjne dla danego typu produktu, bo sklepy nie publikują tabel na kartach asortymentu.
+
+Baza dań w `js/seed-dishes.js` zawiera **157 pozycji**: 89 dań domowych oraz 68 dań fast food z McDonald’s, KFC, Popeyes i Burger King. Pięć wariantów Burgera Drwala ma wartości z oficjalnej tabeli McDonald’s: Klasyczny 923 kcal, z kurczakiem 863, z żurawiną 940, Serowy 974 i Na ostro 900 kcal na porcję. Dania domowe są szacunkami dla typowych porcji.
 
 Wyszukiwanie `bułka` powinno pokazywać różne warianty: kajzerkę, bułkę pszenną, grahamkę, wieloziarnistą, z ziarnami, żytnią, orkiszową, proteinową, mleczną, maślaną, słodką, do hot doga, hamburgerową, bajgiel, precel, ciabattę, bagietkę, wariant bezglutenowy i inne produkty piekarnicze.
 
 ## Ważne rozróżnienie: produkt ogólny a konkretny produkt sklepowy
 
-Katalog startowy to katalog **produktów ogólnych / referencyjnych**, a nie katalog oficjalnych kodów SKU z Lidla, Biedronki, Kauflandu i Carrefour. Np. „Bułka grahamka” oznacza kategorię produktu, a nie konkretną grahamkę marki własnej Lidla. Jej receptura, masa i kaloryczność mogą różnić się od produktu z innej sieci lub piekarni.
+`js/seed-products.js` to katalog **produktów ogólnych / referencyjnych**, a nie katalog oficjalnych kodów SKU. Np. „Bułka grahamka” w tym module oznacza kategorię produktu, a nie konkretną grahamkę marki własnej Lidla. Osobny moduł `store-products.js` zawiera potwierdzone pozycje sklepowe: Biedronkę z oficjalnymi wartościami i pieczywo Lidla/Kauflanda z wartościami orientacyjnymi. Nie mieszaj tych oznaczeń: `sourceKind` przy każdym produkcie mówi, czy dane pochodzą z karty sklepu, czy są referencyjne.
 
 Większość wbudowanych pozycji ma `sourceKind: "generic-reference"` i widoczną w aplikacji notę:
 
@@ -18,7 +22,7 @@ Wartość należy traktować jako przybliżenie do szybkiego dziennika. Przy opa
 
 Jedna pozycja `Bułka słodka drożdżowa` ma jawne źródło DTU Frida (food ID 1334): 296 kcal, białko 9,1 g, tłuszcz 6,6 g, węglowodany 48,7 g / 100 g. Jest to duńska kategoria referencyjna „Rolls, sweet dough type”, nie polski SKU. Link: https://frida.fooddata.dk/index.php/food/1334?lang=en . Zbiór Frida 6.1 jest publikowany na licencji CC BY 4.0 — przy tej pozycji zachowujemy wskazanie źródła i licencji.
 
-**Nie opisujemy wszystkich 1189 rekordów jako oficjalnie potwierdzonych danych sklepowych.** Byłoby to nieprawdziwe. To lekka, praktyczna baza początkowa z wartościami orientacyjnymi, którą można potem zastępować etykietami konkretnych produktów.
+**Nie opisujemy wszystkich 1540 rekordów produktowych jako oficjalnie potwierdzonych danych sklepowych.** Byłoby to nieprawdziwe. 1189 produktów ogólnych to lekka baza referencyjna; 169 pozycji Biedronki ma oficjalne karty, a 182 pozycje Lidla/Kauflanda to asortyment z orientacyjnymi wartościami. Przy pakowanym produkcie nadrzędna jest etykieta.
 
 ## Co jest potrzebne, aby mieć oficjalne wartości dla szerokiej gamy produktów?
 
@@ -29,7 +33,7 @@ Jedna pozycja `Bułka słodka drożdżowa` ma jawne źródło DTU Frida (food ID
 
 ## Dlaczego nie ma w tej paczce 100% asortymentu sklepów?
 
-Nie ma jednego publicznego, darmowego, oficjalnego dumpa całego aktualnego asortymentu tych czterech sieci. Asortyment jest zmienny, część produktów sprzedawana jest luzem, a dane na stronach sieci mogą nie być dostępne jako otwarty eksport. Publiczna baza OFF jest cenna, ale crowdsourcingowa i nie gwarantuje pełnego pokrycia.
+Nie ma jednego publicznego, darmowego, oficjalnego dumpa całego aktualnego asortymentu tych sieci. Asortyment jest zmienny, część produktów sprzedawana jest luzem, a dane na stronach sieci mogą nie być dostępne jako otwarty eksport. Publiczna baza OFF jest cenna, ale crowdsourcingowa i nie gwarantuje pełnego pokrycia.
 
 Do dokładnych pozycji sklepowych używaj w pierwszej kolejności:
 - skanowania EAN / lokalnego importu Open Food Facts;
