@@ -1,8 +1,8 @@
 # Przepływ danych w Dzienniku Żywieniowym
 
 Dokument opisuje, jak aplikacja łączy **produkt → posiłek → dzień → danie → plan**.
-Opis dotyczy wersji z katalogiem ogólnym (`js/seed-products.js`), katalogiem sklepowym
-(`js/store-products.js`) i bazą dań (`js/seed-dishes.js`).
+Opis dotyczy wersji z jednym plikiem produktów (`js/products.js`), jednym plikiem dań
+(`js/dishes.js`) i przykładowym planem tygodniowym (`js/plans.js`).
 
 **Terminologia:** interfejs używa nazwy **„Dania”**. W kodzie i w Firestore nadal
 występuje historyczna nazwa `recipes` / `state.recipes` — to techniczna nazwa magazynu
@@ -19,7 +19,7 @@ z Firestore w dokumencie konta (`profile_female`, `profile_male`, `shared`).
 ```
                  ┌────────────────────────────┐
                  │  PRODUKT (produkt)         │
-                 │  seed-products.js (readonly)│
+                 │  products.js (readonly)     │
                  │  state.customProducts      │
                  └─────────────┬──────────────┘
                                │ wybór + gramatura
@@ -50,7 +50,7 @@ z Firestore w dokumencie konta (`profile_female`, `profile_male`, `shared`).
 
 Dwa źródła produktów:
 
-1. **Katalog startowy** — `seedProducts` z `js/seed-products.js` (1189 pozycji).
+1. **Katalog startowy** — `products` z `js/products.js` (1540 pozycji: 1189 ogólnych i 351 sklepowych).
    Tylko do odczytu. Wartości referencyjne dla kategorii produktu, nie etykiety SKU.
 2. **Produkty własne** — `state.customProducts`. Pełny CRUD w zakładce „Produkty”.
    `sourceKind: "custom"`.

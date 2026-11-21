@@ -2,8 +2,10 @@
 """Build a read-only Biedronka product catalog from official product pages.
 
 Source: https://zakupy.biedronka.pl/ (official Biedronka online shop).
-The generated file contains only values shown on the official product page
-(nutrition per 100 g/ml). It intentionally does not invent missing values.
+The records are written into the BIEDRONKA-CATALOG-START/END block of
+js/products.js, so the whole product catalog stays in one data module.
+Only values shown on the official product page are used (nutrition per
+100 g/ml); missing values stay null.
 """
 from __future__ import annotations
 
@@ -163,7 +165,7 @@ def parse_product(url: str, category: str):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=0, help="limit produktów na kategorię (test)")
-    parser.add_argument("--out", default="js/store-products-biedronka.js")
+    parser.add_argument("--out", default="js/products.js")
     args = parser.parse_args()
 
     all_links = []
@@ -194,17 +196,26 @@ def main():
     rows.sort(key=lambda row: (row["category"], row["name"].lower()))
     payload = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
     out = Path(args.out)
-    out.write_text(
-        "/**\n"
-        " * Oficjalne produkty Biedronki — wygenerowane z kart produktów\n"
-        " * https://zakupy.biedronka.pl/ (wartości na 100 g/ml).\n"
-        " * Nie zawiera wartości wymyślonych; brak danych oznacza null.\n"
-        " * Plik generowany przez tools/build_biedronka_catalog.py.\n"
-        " */\n"
-        f"export const biedronkaProducts = {payload};\n"
-        f"export const biedronkaCatalogInfo = {{ count: {len(rows)}, source: 'https://zakupy.biedronka.pl/' }};\n",
-        encoding="utf-8",
+    if not out.exists():
+        raise SystemExit(f"Brak pliku {out} — najpierw utwórz szkielet katalogu.")
+    with out.open("r", encoding="utf-8", newline="") as handle:
+        text = handle.read()
+    start_token = "// BIEDRONKA-CATALOG-START"
+    end_token = "// BIEDRONKA-CATALOG-END"
+    start = text.find(start_token)
+    end = text.find(end_token, start + 1)
+    if start < 0 or end < 0:
+        raise SystemExit(f"W pliku {out} brak markerów {start_token} / {end_token}.")
+    newline = chr(13) + chr(10) if chr(13) in text else chr(10)
+    insertion = (
+        start_token
+        + newline
+        + f"const biedronkaProducts = {payload};"
+        + newline
+        + end_token
     )
+    with out.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(text[:start] + insertion + text[end + len(end_token):])
     print(f"Zapisano {len(rows)} produktów do {out}", file=sys.stderr)
 
 

@@ -427,3 +427,102 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulati
 .metrics-legend{margin:10px 2px 0;font-size:10.5px;line-height:1.55;color:var(--muted)}
 .metrics-legend b{color:#425a4c}
 @media(max-width:620px){.field-hint,.field-hints p{font-size:9.5px;line-height:1.4}}
+
+
+/* ===========================================================================
+   POPRAWKI RESPONSYWNOŚCI I UJEDNOLICENIE FORMULARZY
+   Blok na końcu pliku celowo nadpisuje wcześniejsze reguły.
+   =========================================================================== */
+
+/* Nic nie może rozszerzać strony ponad szerokość ekranu. */
+html,body{max-width:100%}
+html{overflow-x:clip}
+body{overflow-x:clip}
+img,svg,video,canvas{max-width:100%}
+
+/* Treść pola (długa nazwa dania, opcje selecta) nie ustala szerokości layoutu. */
+input,select,textarea{max-width:100%;min-width:0}
+select{width:100%;text-overflow:ellipsis}
+label,fieldset{min-width:0}
+.add-form-grid,.form-grid,.portion-grid,.search-options,.plan-assignment-row,.settings-row,.recipe-toolbar,.product-toolbar{min-width:0}
+.add-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.portion-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+.portion-grid--single{grid-template-columns:minmax(0,1fr) auto}
+.search-options{grid-template-columns:repeat(2,minmax(0,1fr)) auto}
+.plan-assignment-row{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,2fr) minmax(0,.7fr) 34px}
+.add-form-grid>label,.add-form-grid>div,.form-grid>label,.portion-grid>label,.portion-grid>div,.search-options>label,.plan-assignment-row>label{min-width:0}
+.portion-grid .kcal-preview{min-width:86px}
+.add-form-grid input,.add-form-grid select,.form-grid input,.form-grid select,.portion-grid input,.portion-grid select{width:100%}
+.portion-meta{font-size:10px;line-height:1.45;color:var(--muted);margin:8px 0 0;min-height:14px}
+
+/* Programowe przewijanie nie chowa treści pod przyklejonym nagłówkiem. */
+.add-card,.add-mode-panel,.selected-panel,.portion-grid{scroll-margin-top:88px;scroll-margin-bottom:24px}
+
+/* Data dziennika i data przykładowego tygodnia trzymają się kontenera. */
+.date-box,.date-field{min-width:0;max-width:100%}
+.date-box input,.date-field input{display:block;width:100%;max-width:100%;min-width:0}
+.date-field{flex:1 1 220px;width:100%;max-width:320px}
+.topline>*{min-width:0}
+@media(min-width:621px){
+  .date-box{width:auto}
+  .date-box input{width:auto;min-width:190px}
+}
+
+/* Produkty: wyszukiwanie i Źródło w osobnych, pełnych wierszach. */
+.product-toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
+.product-toolbar .recipe-search{max-width:none;width:100%;min-height:48px}
+.product-toolbar .recipe-filter{width:100%;min-height:48px}
+
+/* Ustawienia: jednakowe przyciski, pełne pola i spójna wysokość. */
+#settingsDialog .settings-section>label{width:100%}
+#settingsDialog #workerUrl{width:100%;max-width:100%}
+#settingsDialog .settings-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;align-items:stretch;width:100%}
+#settingsDialog .settings-row>*{width:100%;min-width:0;min-height:44px;flex:none;margin:0}
+#settingsDialog .settings-row>button,
+#settingsDialog .settings-row>.file-button{height:44px;padding:0 14px;border-radius:12px;font-size:11px;justify-content:center}
+#settingsDialog .settings-row>.file-button{display:inline-flex;align-items:center;gap:8px}
+#settingsDialog .dialog-actions{margin-top:18px}
+#settingsDialog .dialog-actions button{min-height:44px}
+.dialog{max-height:min(94dvh,940px)}
+.dialog-body{overscroll-behavior:contain}
+.settings-section:first-of-type{border-top:0;padding-top:4px}
+
+/* Telefon: pełne szerokości i stabilne, większe pola dotykowe. */
+@media(max-width:700px){
+  #settingsDialog .settings-row{grid-template-columns:minmax(0,1fr)}
+  #settingsDialog .settings-row>*{width:100%}
+  .product-toolbar .recipe-search,.product-toolbar .recipe-filter{width:100%}
+  .add-form-grid{grid-template-columns:minmax(0,1fr)}
+  .portion-grid{grid-template-columns:minmax(0,1fr)}
+  .portion-grid .kcal-preview{grid-column:auto}
+  .dialog-actions{display:grid;grid-template-columns:minmax(0,1fr)}
+  .dialog-actions button{width:100%}
+}
+@media(max-width:620px){
+  .topbar{gap:8px;padding-left:10px;padding-right:10px}
+  .brand{flex:1 1 auto;overflow:hidden}
+  .brand span{overflow:hidden}
+  .brand strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-actions{flex:0 0 auto;gap:6px}
+  .shell{padding-left:10px;padding-right:10px;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+  .search-options{grid-template-columns:minmax(0,1fr)}
+  .search-options button{grid-column:auto;width:100%}
+  .date-box{width:100%}
+  .mode-chip{flex:1 1 100%;justify-content:center}
+  .tabs{gap:4px}
+  .tab{min-width:0;flex:1 1 0;padding:9px 4px;font-size:10.5px}
+}
+@media(max-width:420px){
+  .tab{padding:8px 3px;font-size:10px}
+  .mode-chip{padding:8px 7px;font-size:10px}
+  .dialog,.dialog.wide{width:calc(100vw - 16px);max-width:calc(100vw - 16px)}
+  .dialog-body{padding:14px}
+  .settings-section h3{font-size:13px}
+}
+/* Nagłówek „Przykładowy tydzień”: tag PRZYKŁAD ma stać obok tytułu, wyrównany do lewej. */
+.sample-heading .subsection-title{justify-content:flex-start}
+.sample-heading .subsection-title .sample-tag{margin-left:0}
+/* Skróty ilości w panelu dodawania: zaokrąglone tagi sztuk/porcji. */
+.unit-shortcuts button{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:6px 12px;border:1px solid #dbe6dc;border-radius:99px;background:#fff;color:var(--green);font-size:10.5px;font-weight:700;line-height:1.2;white-space:nowrap}
+.unit-shortcuts button:hover{background:#eef6ef;border-color:#bcd6c4}

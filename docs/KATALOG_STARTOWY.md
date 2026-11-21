@@ -2,21 +2,21 @@
 
 ## Zawartość
 
-Aplikacja ma **1189 produktów ogólnych** w `js/seed-products.js` oraz **351 produktów sklepowych** w `js/store-products.js` i `js/store-products-biedronka.js`. Katalog ogólny obejmuje codzienne kategorie: owoce, warzywa, pieczywo, bułki, produkty zbożowe, nabiał, jaja, mięso, ryby, strączki, konserwy, tłuszcze, sosy, orzechy, słodycze, dania gotowe i napoje. Katalog sklepowy zawiera 169 pozycji Biedronki z oficjalnych kart produktów (z linkiem i wartościami na 100 g/ml) oraz 182 pozycje Lidla i Kauflandu z oficjalnych stron asortymentu: 123 produkty Lidla (63 pieczywo, 16 mięso, 15 wędlin, 29 nabiał) i 59 Kauflandu (14 pieczywo, 20 mięso, 8 wędlin, 17 nabiał). Lidl i Kaufland nie udostępniają tam pełnych tabel, więc ich wartości są orientacyjne i oznaczone `retailer-assortment-reference`.
+Aplikacja ma **1540 produktów w jednym pliku `js/products.js`**: **1189 produktów ogólnych** i **351 produktów sklepowych**. Katalog ogólny obejmuje codzienne kategorie: owoce, warzywa, pieczywo, bułki, produkty zbożowe, nabiał, jaja, mięso, ryby, strączki, konserwy, tłuszcze, sosy, orzechy, słodycze, dania gotowe i napoje. Katalog sklepowy zawiera 169 pozycji Biedronki z oficjalnych kart produktów (z linkiem i wartościami na 100 g/ml) oraz 182 pozycje Lidla i Kauflandu z oficjalnych stron asortymentu: 123 produkty Lidla (63 pieczywo, 16 mięso, 15 wędlin, 29 nabiał) i 59 Kauflandu (14 pieczywo, 20 mięso, 8 wędlin, 17 nabiał). Lidl i Kaufland nie udostępniają tam pełnych tabel, więc ich wartości są orientacyjne i oznaczone `retailer-assortment-reference`.
 
 Mięso i nabiał Lidla pochodzą z oficjalnych stron marki Rzeźnik, Pikok i Pilos. Kaufland korzysta z oficjalnego leksykonu mięsa, wędlin oraz produktów mlecznych i jajek. Nazwy są zgodne z tymi stronami; wartości odżywcze są referencyjne dla danego typu produktu, bo sklepy nie publikują tabel na kartach asortymentu.
 
-Baza dań w `js/seed-dishes.js` zawiera **157 pozycji**: 89 dań domowych oraz 68 dań fast food z McDonald’s, KFC, Popeyes i Burger King. Pięć wariantów Burgera Drwala ma wartości z oficjalnej tabeli McDonald’s: Klasyczny 923 kcal, z kurczakiem 863, z żurawiną 940, Serowy 974 i Na ostro 900 kcal na porcję. Dania domowe są szacunkami dla typowych porcji.
+Baza dań w `js/dishes.js` zawiera **157 pozycji**: 89 dań domowych oraz 68 dań fast food z McDonald’s, KFC, Popeyes i Burger King. Pięć wariantów Burgera Drwala ma wartości z oficjalnej tabeli McDonald’s: Klasyczny 923 kcal, z kurczakiem 863, z żurawiną 940, Serowy 974 i Na ostro 900 kcal na porcję. Dania domowe są szacunkami dla typowych porcji.
 
 Wyszukiwanie `bułka` powinno pokazywać różne warianty: kajzerkę, bułkę pszenną, grahamkę, wieloziarnistą, z ziarnami, żytnią, orkiszową, proteinową, mleczną, maślaną, słodką, do hot doga, hamburgerową, bajgiel, precel, ciabattę, bagietkę, wariant bezglutenowy i inne produkty piekarnicze.
 
 ## Ważne rozróżnienie: produkt ogólny a konkretny produkt sklepowy
 
-`js/seed-products.js` to katalog **produktów ogólnych / referencyjnych**, a nie katalog oficjalnych kodów SKU. Np. „Bułka grahamka” w tym module oznacza kategorię produktu, a nie konkretną grahamkę marki własnej Lidla. Osobny moduł `store-products.js` zawiera potwierdzone pozycje sklepowe: Biedronkę z oficjalnymi wartościami i pieczywo Lidla/Kauflanda z wartościami orientacyjnymi. Nie mieszaj tych oznaczeń: `sourceKind` przy każdym produkcie mówi, czy dane pochodzą z karty sklepu, czy są referencyjne.
+`js/products.js` łączy **produkty ogólne / referencyjne** i potwierdzone pozycje sklepowe, ale nadal są to dwa rodzaje danych. Np. „Bułka grahamka” z `store: "Ogólne"` oznacza kategorię produktu, a nie konkretną grahamkę marki własnej Lidla; pozycje z `store: "Biedronka"`, `"Lidl"` lub `"Kaufland"` to konkretny asortyment. Nie mieszaj tych oznaczeń: `sourceKind` przy każdym produkcie mówi, czy dane pochodzą z karty sklepu, czy są referencyjne.
 
 Większość wbudowanych pozycji ma `sourceKind: "generic-reference"` i widoczną w aplikacji notę:
 
-> Wartość orientacyjna dla produktu ogólnego — nie jest etykietą konkretnego SKU sklepowego.
+> Wartość orientacyjna dla produktu.
 
 Wartość należy traktować jako przybliżenie do szybkiego dziennika. Przy opakowanym produkcie nadrzędna jest etykieta konkretnego opakowania; rozporządzenie UE 1169/2011 określa deklarację żywieniową w przeliczeniu na 100 g lub 100 ml. Pomocniczo: [GIS — znakowanie żywności](https://www.gov.pl/web/gis/znakowanie-zywnosci).
 

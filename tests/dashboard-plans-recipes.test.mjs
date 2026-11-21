@@ -59,11 +59,13 @@ test('backup controls are in settings, not in the sticky header',()=>{
 });
 
 
-test('service worker pre-caches the single merged starter catalog module',()=>{
+test('service worker pre-caches exactly the three data modules',()=>{
   const sw=readFile(new URL('../sw.js',import.meta.url),'utf8');
   return sw.then(source=>{
-    assert.match(source,/seed-products\.js/);
-    assert.doesNotMatch(source,/seed-products-extra/);
+    assert.match(source,/products\.js/);
+    assert.match(source,/dishes\.js/);
+    assert.match(source,/plans\.js/);
+    assert.doesNotMatch(source,/seed-products|store-products|seed-dishes|seed-plans/);
   });
 });
 

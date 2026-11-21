@@ -138,21 +138,36 @@
             </div>
             </div>
             <div class="add-mode-panel hidden" data-add-panel="recipe">
-              <p class="panel-note">Wybierz danie z bazy domowej lub fast food albo własne. Dodajemy je do wybranego dnia i posiłku w podanej liczbie porcji.</p>
+              <p class="panel-note">Wybierz danie z bazy domowej lub fast food albo własne. Ustaw posiłek i ilość — liczbę porcji albo gramaturę — a aplikacja przeliczy wartości.</p>
               <div class="add-form-grid">
                 <label class="add-form-wide">Danie<select id="diaryRecipe"></select></label>
-                <label>Porcje<input id="diaryRecipeServings" type="number" min="0.25" max="20" step="0.25" value="1" inputmode="decimal"></label>
                 <label>Posiłek<select id="diaryRecipeMeal"><option>Śniadanie</option><option>II śniadanie</option><option>Obiad</option><option>Podwieczorek</option><option>Kolacja</option><option>Przekąski</option></select></label>
+                <label>Jednostka<select id="diaryRecipeUnit"><option value="servings">Liczba porcji</option><option value="grams">Gramatura (g)</option></select></label>
               </div>
+              <div class="portion-grid portion-grid--single">
+                <label id="diaryRecipeServingsField">Liczba porcji<input id="diaryRecipeServings" type="number" min="0.25" max="20" step="0.25" value="1" inputmode="decimal"></label>
+                <label id="diaryRecipeGramsField" class="hidden">Gramatura (g)<input id="diaryRecipeGrams" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal"></label>
+                <div class="kcal-preview"><small>W tej porcji</small><b id="diaryRecipeKcal">— kcal</b></div>
+              </div>
+              <div class="unit-shortcuts" id="diaryRecipeShortcuts"></div>
+              <p class="portion-meta" id="diaryRecipeMeta"></p>
               <button class="primary full" id="addRecipeToDiary" type="button"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg> Dodaj danie do dnia</button>
             </div>
             <div class="add-mode-panel hidden" data-add-panel="plan-day">
-              <p class="panel-note">Dzień z własnego planu wstawia wszystkie jego posiłki z wybranego dnia planu do dnia wybranego w dzienniku.</p>
+              <p class="panel-note">Dzień z własnego planu wstawia wszystkie jego posiłki do wybranego dnia dziennika. Ustaw ilość — liczbę porcji albo gramaturę całego dnia.</p>
               <div class="add-form-grid">
                 <label class="add-form-wide">Własny plan<select id="diaryPlan"></select></label>
                 <label class="add-form-wide">Dzień planu<select id="diaryPlanDay"></select></label>
+                <label>Posiłek<select id="diaryPlanMeal"><option value="">Z planu</option><option>Śniadanie</option><option>II śniadanie</option><option>Obiad</option><option>Podwieczorek</option><option>Kolacja</option><option>Przekąski</option></select></label>
+                <label>Jednostka<select id="diaryPlanUnit"><option value="servings">Liczba porcji</option><option value="grams">Gramatura (g)</option></select></label>
               </div>
-              <p class="panel-note" id="diaryPlanSummary"></p>
+              <div class="portion-grid portion-grid--single">
+                <label id="diaryPlanServingsField">Liczba porcji<input id="diaryPlanServings" type="number" min="0.25" max="20" step="0.25" value="1" inputmode="decimal"></label>
+                <label id="diaryPlanGramsField" class="hidden">Gramatura (g)<input id="diaryPlanGrams" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal"></label>
+                <div class="kcal-preview"><small>W tej porcji</small><b id="diaryPlanKcal">— kcal</b></div>
+              </div>
+              <div class="unit-shortcuts" id="diaryPlanShortcuts"></div>
+              <p class="portion-meta" id="diaryPlanSummary"></p>
               <button class="primary full" id="addPlanDayToDiary" type="button"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg> Dodaj dzień planu do dnia</button>
             </div>
           </article>
@@ -231,7 +246,7 @@
           <div><strong id="productStoreCount">0</strong><span>sklepowych</span></div>
         </div>
         <div class="product-toolbar"><label class="recipe-search"><span class="search-icon" aria-hidden="true"><svg class="i"><use href="#i-search"></use></svg></span><input id="productSearchCatalog" type="search" placeholder="Szukaj produktu, np. bułka, skyr, schab…" autocomplete="off"></label><label class="recipe-filter"><span>Źródło</span><select id="productStoreFilter"><option value="all">Wszystkie</option><option value="custom">Twoje produkty</option><option value="Biedronka">Biedronka</option><option value="Lidl">Lidl</option><option value="Kaufland">Kaufland</option><option value="Ogólne">Ogólne</option></select></label></div>
-        <div class="subsection-heading"><div><p class="eyebrow">KATALOG I WŁASNE</p><div class="subsection-title"><h2>Baza produktów</h2><span class="sample-tag" id="seedProductCount">0 POZYCJI</span></div><p class="muted">Biedronka: wartości z oficjalnych kart produktów. Lidl i Kaufland: nazwy z oficjalnych stron asortymentu, wartości orientacyjne dla typu produktu. Twoje produkty możesz edytować i usuwać. Przy opakowanym produkcie nadrzędna jest etykieta.</p></div></div>
+        <div class="subsection-heading"><div><p class="eyebrow">KATALOG I WŁASNE</p><div class="subsection-title"><h2>Baza produktów</h2><span class="sample-tag" id="seedProductCount">0 POZYCJI</span></div><p class="muted">Katalog startowy łączy produkty ogólne, asortyment sklepowy (Biedronka, Lidl, Kaufland, Carrefour) i Twoje produkty. Wartości pochodzą z oficjalnych kart produktów, stron asortymentowych lub opracowań referencyjnych — część z nich jest orientacyjna. Przy opakowanym produkcie nadrzędna jest etykieta konkretnego opakowania.</p></div></div>
         <p id="productsStatus" class="help-line" aria-live="polite"></p>
         <div id="seedProductsList" class="product-grid"></div>
         <button id="loadMoreProducts" class="secondary full" type="button"><svg class="i" aria-hidden="true"><use href="#i-chevron-down"></use></svg> Pokaż więcej produktów</button>

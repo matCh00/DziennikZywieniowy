@@ -1,31 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {storeProducts,storeCatalogInfo,lidlProducts,lidlMeatProducts,lidlDeliProducts,lidlDairyProducts,kauflandProducts,kauflandMeatProducts,kauflandDeliProducts,kauflandDairyProducts} from '../js/store-products.js';
-import {seedDishes,dishCatalogInfo} from '../js/seed-dishes.js';
+import {products,productCatalogInfo} from '../js/products.js';
+import {dishes,dishCatalogInfo} from '../js/dishes.js';
+
+const storeProducts=products.filter(p=>p.store!=='Ogólne');
+const biedronka=storeProducts.filter(p=>p.store==='Biedronka');
+const lidl=storeProducts.filter(p=>p.store==='Lidl');
+const kaufland=storeProducts.filter(p=>p.store==='Kaufland');
+const byCategory=(rows,category)=>rows.filter(p=>p.category===category);
+const lidlMeat=byCategory(lidl,'Mięso i drób');
+const lidlDeli=byCategory(lidl,'Wędliny i kiełbasy');
+const lidlDairy=byCategory(lidl,'Nabiał i jaja');
+const kauflandMeat=byCategory(kaufland,'Mięso i drób');
+const kauflandDeli=byCategory(kaufland,'Wędliny i kiełbasy');
+const kauflandDairy=byCategory(kaufland,'Nabiał i jaja');
+const lidlBakery=[...byCategory(lidl,'Pieczywo i wypieki'),...byCategory(lidl,'Słodkie wypieki')];
+const kauflandBakery=byCategory(kaufland,'Pieczywo i wypieki');
 
 test('store catalog combines Biedronka, Lidl and Kaufland with unique IDs',()=>{
   assert.ok(storeProducts.length>=340,`expected store catalog, got ${storeProducts.length}`);
   assert.equal(new Set(storeProducts.map(p=>p.id)).size,storeProducts.length);
   assert.deepEqual([...new Set(storeProducts.map(p=>p.store))].sort(),['Biedronka','Kaufland','Lidl']);
-  assert.equal(storeCatalogInfo.count,storeProducts.length);
-  assert.equal(storeCatalogInfo.biedronka,169);
-  assert.equal(storeCatalogInfo.lidl,lidlProducts.length+lidlMeatProducts.length+lidlDeliProducts.length+lidlDairyProducts.length);
-  assert.equal(storeCatalogInfo.kaufland,kauflandProducts.length+kauflandMeatProducts.length+kauflandDeliProducts.length+kauflandDairyProducts.length);
-  assert.equal(storeCatalogInfo.lidlMeat,lidlMeatProducts.length);
-  assert.equal(storeCatalogInfo.lidlDeli,lidlDeliProducts.length);
-  assert.equal(storeCatalogInfo.lidlDairy,lidlDairyProducts.length);
-  assert.equal(storeCatalogInfo.kauflandMeat,kauflandMeatProducts.length);
-  assert.equal(storeCatalogInfo.kauflandDeli,kauflandDeliProducts.length);
-  assert.equal(storeCatalogInfo.kauflandDairy,kauflandDairyProducts.length);
+  assert.equal(productCatalogInfo.count,products.length);
+  assert.equal(productCatalogInfo.storeCount,storeProducts.length);
+  assert.equal(productCatalogInfo.biedronka,biedronka.length);
+  assert.equal(productCatalogInfo.lidl,lidl.length);
+  assert.equal(productCatalogInfo.kaufland,kaufland.length);
 });
 
 test('Lidl and Kaufland meat and dairy entries use official assortment names and reference values',()=>{
-  const meatAndDairy=[...lidlMeatProducts,...lidlDeliProducts,...lidlDairyProducts,...kauflandMeatProducts,...kauflandDeliProducts,...kauflandDairyProducts];
+  const meatAndDairy=[...lidlMeat,...lidlDeli,...lidlDairy,...kauflandMeat,...kauflandDeli,...kauflandDairy];
   assert.ok(meatAndDairy.length>=100,`expected at least 100 meat/dairy entries, got ${meatAndDairy.length}`);
-  assert.ok(lidlMeatProducts.length>=15);
-  assert.ok(lidlDairyProducts.length>=25);
-  assert.ok(kauflandMeatProducts.length>=18);
-  assert.ok(kauflandDairyProducts.length>=15);
+  assert.ok(lidlMeat.length>=15);
+  assert.ok(lidlDairy.length>=25);
+  assert.ok(kauflandMeat.length>=18);
+  assert.ok(kauflandDairy.length>=15);
   for(const p of meatAndDairy){
     assert.equal(p.sourceKind,'retailer-assortment-reference',p.id);
     assert.match(p.sourceUrl,/^https:\/\/(www\.lidl\.pl|sklep\.kaufland\.pl)\//,p.id);
@@ -44,9 +53,8 @@ test('Lidl and Kaufland meat and dairy entries use official assortment names and
 });
 
 test('Biedronka entries keep official card source and valid nutrition',()=>{
-  const biedronka=storeProducts.filter(p=>p.store==='Biedronka');
   assert.ok(biedronka.length>=160);
-  assert.ok(biedronka.filter(p=>p.category==='Pieczywo').length>=25);
+  assert.ok(byCategory(biedronka,'Pieczywo').length>=25);
   for(const p of biedronka){
     assert.equal(p.sourceKind,'retailer-official');
     assert.match(p.sourceUrl,/^https:\/\/zakupy\.biedronka\.pl\//);
@@ -56,31 +64,31 @@ test('Biedronka entries keep official card source and valid nutrition',()=>{
 });
 
 test('Lidl and Kaufland bakery assortment is clearly labelled as reference data',()=>{
-  assert.ok(lidlProducts.length>=60);
-  assert.ok(kauflandProducts.length>=14);
-  for(const p of [...lidlProducts,...kauflandProducts]){
+  assert.ok(lidlBakery.length>=60);
+  assert.ok(kauflandBakery.length>=14);
+  for(const p of [...lidlBakery,...kauflandBakery]){
     assert.equal(p.sourceKind,'retailer-assortment-reference');
     assert.match(p.sourceUrl,/^https:\/\//);
     assert.ok(p.name&&p.category&&p.store);
   }
-  assert.ok(lidlProducts.some(p=>/kajzerka/i.test(p.name)));
-  assert.ok(kauflandProducts.some(p=>/chleb wiejski/i.test(p.name)));
+  assert.ok(lidlBakery.some(p=>/kajzerka/i.test(p.name)));
+  assert.ok(kauflandBakery.some(p=>/chleb wiejski/i.test(p.name)));
 });
 
 test('dish catalog has homemade and fast-food entries with unique IDs',()=>{
-  assert.ok(seedDishes.length>=150,`expected dish catalog, got ${seedDishes.length}`);
-  assert.equal(new Set(seedDishes.map(d=>d.id)).size,seedDishes.length);
-  assert.equal(dishCatalogInfo.count,seedDishes.length);
+  assert.ok(dishes.length>=150,`expected dish catalog, got ${dishes.length}`);
+  assert.equal(new Set(dishes.map(d=>d.id)).size,dishes.length);
+  assert.equal(dishCatalogInfo.count,dishes.length);
   assert.ok(dishCatalogInfo.homemade>=85);
   assert.ok(dishCatalogInfo.fastFood>=60);
-  for(const d of seedDishes){
+  for(const d of dishes){
     assert.ok(d.id&&d.name&&d.meal&&d.servingWeight>0,d.id);
     for(const k of ['kcal','protein','fat','carbs'])assert.ok(Number.isFinite(d[k])&&d[k]>=0,`${d.id}.${k}`);
   }
 });
 
 test('all five Burger Drwala variants are present with official calories',()=>{
-  const drwale=seedDishes.filter(d=>/Burger Drwala/.test(d.name));
+  const drwale=dishes.filter(d=>/Burger Drwala/.test(d.name));
   assert.equal(drwale.length,5);
   const expected=new Map([['Klasyczny',923],['z kurczakiem',863],['z żurawiną',940],['Serowy',974],['Na ostro',900]]);
   for(const [variant,kcal] of expected){

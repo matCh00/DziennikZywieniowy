@@ -12,8 +12,9 @@ Responsywna aplikacja do dziennego monitorowania kalorii, produktów, gramatur, 
 - `docs/OPEN_FOOD_FACTS_SETUP.md` — konto, API, eksporty, limity i licencje OFF.
 - `docs/BAZA_LOKALNA_OFF.md` — pełna instrukcja aktualizacji katalogu i importu w aplikacji.
 - `docs/KATALOG_STARTOWY.md` — opis katalogu (1189 produktów ogólnych + 351 produktów sklepowych) i bazy dań, pochodzenia i ograniczeń dokładności.
-- `js/store-products.js`, `js/store-products-biedronka.js` — katalog sklepowy: 169 produktów Biedronki z oficjalnych kart oraz 182 pozycje Lidla i Kauflanda (pieczywo, mięso, wędliny, nabiał).
-- `js/seed-dishes.js` — 157 dań: 89 domowych i 68 fast food (McDonald’s, KFC, Popeyes, Burger King).
+- `js/products.js` — jeden plik produktów: 1189 produktów ogólnych oraz 351 sklepowych (169 Biedronki z oficjalnych kart, 123 Lidla i 59 Kauflanda).
+- `js/dishes.js` — jeden plik dań: 157 pozycji, 89 domowych i 68 fast food (McDonald’s, KFC, Popeyes, Burger King).
+- `js/plans.js` — przykładowy plan tygodniowy i opis formatu planów.
 - `js/firebase-config.js`, `js/firebase-sync.js`, `firestore.rules` — logowanie e-mail/hasło i synchronizacja danych per konto.
 - `tests/` — testy bez prawdziwych kluczy API.
 
@@ -34,7 +35,7 @@ Zapisany katalog działa offline po zaimportowaniu. Jest związany z daną przeg
 
 ### Katalog startowy bez pobierania dużych plików
 
-Wbudowany katalog ma dwa poziomy. `js/seed-products.js` zawiera 1189 produktów ogólnych i wariantów przygotowania. `js/store-products.js` dodaje 351 pozycji sklepowych: 169 produktów Biedronki z oficjalnych kart (na 100 g/ml, z linkiem do źródła) oraz 182 pozycje Lidla i Kauflandu: 123 produkty Lidla (pieczywo, mięso, wędliny, nabiał) i 59 Kauflandu (pieczywo, mięso, wędliny, nabiał). Lidl i Kaufland nie publikują pełnych tabel odżywczych na tych kartach, więc ich wartości są orientacyjne i oznaczone w aplikacji. Wyszukiwanie „bułka” zwraca szeroki wybór pieczywa, a frazy „schab”, „twaróg” lub „mleko” — pozycje mięsne i nabiałowe; filtr sklepu zawęża bazę. Przy produktach pakowanych nadrzędne są wartości z etykiety konkretnego opakowania. Pełny opis źródeł i ograniczeń znajdziesz w [`docs/KATALOG_STARTOWY.md`](docs/KATALOG_STARTOWY.md).
+Wbudowany katalog mieści się w jednym pliku `js/products.js`: 1189 produktów ogólnych i wariantów przygotowania oraz 351 pozycji sklepowych — 169 produktów Biedronki z oficjalnych kart (na 100 g/ml, z linkiem do źródła) oraz 182 pozycje Lidla i Kauflandu: 123 produkty Lidla (pieczywo, mięso, wędliny, nabiał) i 59 Kauflandu (pieczywo, mięso, wędliny, nabiał). Lidl i Kaufland nie publikują pełnych tabel odżywczych na tych kartach, więc ich wartości są orientacyjne i oznaczone w aplikacji. Wyszukiwanie „bułka” zwraca szeroki wybór pieczywa, a frazy „schab”, „twaróg” lub „mleko” — pozycje mięsne i nabiałowe; filtr sklepu zawęża bazę. Przy produktach pakowanych nadrzędne są wartości z etykiety konkretnego opakowania. Pełny opis źródeł i ograniczeń znajdziesz w [`docs/KATALOG_STARTOWY.md`](docs/KATALOG_STARTOWY.md).
 
 Aplikacja ma cztery zakładki: **Dziennik**, **Plan tygodnia**, **Dania** i **Produkty**. Zakładka **Dania** zawiera 157 pozycji: 89 dań domowych oraz 68 pozycji McDonald’s, KFC, Popeyes i Burger King, w tym pięć wariantów Burgera Drwala. Bazę dań można przeglądać bez tworzenia własnych pozycji; własne dania są edytowalne. Wszystkie ikony to jeden wbudowany sprite SVG (`index.html`), a dziennik pokazuje przy każdym wpisie i w podsumowaniu posiłku białko, tłuszcze i węglowodany wraz z udziałem energii (4/9/4 kcal na gram). Posiłki dodajesz do dnia wyłącznie w zakładce „Dziennik” — kartą „Dodaj produkt/danie/dzień”, która obsługuje pojedynczy produkt, danie z bazy lub własne oraz wybrany dzień z własnego planu. Zakładka „Produkty” łączy katalog startowy i własne produkty w jednej liście; filtr „Źródło” pozwala pokazać tylko własne pozycje lub wybraną sieć, a własne produkty można edytować i usuwać. Pełny opis zależności między produktem, posiłkiem, daniem i planem: [`docs/FLOW.md`](docs/FLOW.md).
 

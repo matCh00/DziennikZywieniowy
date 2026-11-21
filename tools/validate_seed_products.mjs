@@ -1,5 +1,5 @@
 /**
- * Walidator katalogu startowego (js/seed-products.js).
+ * Walidator katalogu produktów ogólnych (sekcja „Ogólne” w js/products.js).
  *
  * Sprawdza to, co da się sprawdzić automatycznie i co realnie wskazuje na błąd
  * danych: komplet pól, unikalność identyfikatorów i nazw, zakresy makroskładników,
@@ -8,7 +8,11 @@
  *
  * Uruchomienie: node tools/validate_seed_products.mjs [--verbose]
  */
-import { seedProducts, seedCatalogInfo } from '../js/seed-products.js';
+import { products, productCatalogInfo } from '../js/products.js';
+
+// Katalog sklepowy ma własne kategorie i identyfikatory, więc walidator obejmuje
+// produkty ogólne — dokładnie tę część, dla której zdefiniowano zakresy poniżej.
+const seedProducts = products.filter((p) => p.store === 'Ogólne');
 
 const verbose = process.argv.includes('--verbose');
 const issues = [];
@@ -128,14 +132,17 @@ for (const p of seedProducts) {
   }
 }
 
-if (seedCatalogInfo.count !== seedProducts.length) {
-  issues.push(`seedCatalogInfo.count=${seedCatalogInfo.count}, a rekordów jest ${seedProducts.length}`);
+if (productCatalogInfo.generic !== seedProducts.length) {
+  issues.push(`productCatalogInfo.generic=${productCatalogInfo.generic}, a rekordów ogólnych jest ${seedProducts.length}`);
 }
-if (!/^\d{4}-\d{2}-\d{2}\.\d+$/.test(String(seedCatalogInfo.version))) {
-  issues.push(`seedCatalogInfo.version=${seedCatalogInfo.version} nie ma formatu RRRR-MM-DD.n`);
+if (productCatalogInfo.count !== products.length) {
+  issues.push(`productCatalogInfo.count=${productCatalogInfo.count}, a wszystkich rekordów jest ${products.length}`);
+}
+if (!/^\d{4}-\d{2}-\d{2}\.\d+$/.test(String(productCatalogInfo.version))) {
+  issues.push(`productCatalogInfo.version=${productCatalogInfo.version} nie ma formatu RRRR-MM-DD.n`);
 }
 
-console.log(`Sprawdzono ${seedProducts.length} rekordów (wersja ${seedCatalogInfo.version}).`);
+console.log(`Sprawdzono ${seedProducts.length} rekordów ogólnych (wersja ${productCatalogInfo.version}, cały katalog: ${products.length}).`);
 if (verbose) warnings.forEach((w) => console.log(`OSTRZEŻENIE  ${w}`));
 sourceExceptions.forEach((e) => console.log(`WYJĄTEK ŹRÓDŁOWY  ${e}`));
 issues.forEach((i) => console.log(`BŁĄD  ${i}`));

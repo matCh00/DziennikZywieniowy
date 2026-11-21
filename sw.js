@@ -1,6 +1,6 @@
-const VERSION='3.29';
+const VERSION='3.35';
 const CACHE=`dziennik-zywieniowy-v${VERSION}`;
-const ASSETS=['./','./index.html','./css/styles.css','./js/app.js','./js/seed-products.js','./js/store-products.js','./js/store-products-biedronka.js','./js/seed-dishes.js','./js/profile-utils.js','./js/catalog.js','./js/api.js','./js/firebase-config.js','./js/firebase-sync.js','./assets/icon.svg','./assets/logo.png','./manifest.webmanifest'].map(path=>path==='./'?`./?v=${VERSION}`:`${path}?v=${VERSION}`);
+const ASSETS=['./','./index.html','./css/styles.css','./js/app.js','./js/products.js','./js/dishes.js','./js/plans.js','./js/profile-utils.js','./js/catalog.js','./js/api.js','./js/firebase-config.js','./js/firebase-sync.js','./assets/icon.svg','./assets/logo.png','./manifest.webmanifest'].map(path=>path==='./'?`./?v=${VERSION}`:`${path}?v=${VERSION}`);
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{const request=event.request;const url=new URL(request.url);if(request.method!=='GET'||url.origin!==self.location.origin)return;event.respondWith(caches.match(request,{ignoreSearch:true}).then(hit=>hit||fetch(request).then(response=>{if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(request,copy));}return response;}).catch(()=>caches.match('./index.html',{ignoreSearch:true}))));});
