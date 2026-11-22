@@ -156,7 +156,7 @@ To jedyna droga dodania planu do dziennika. Nie ma już przycisku „Dodaj cały
 
 ### 2.5 Utworzenie i edycja planu
 
-**Plan tygodnia → „＋ Stwórz własny plan”** (KREATOR PLANU):
+**Plan → „＋ Stwórz własny plan”** (KREATOR PLANU):
 
 1. Nazwa i data rozpoczęcia.
 2. Wiersze przypisań: dzień (0–6), posiłek, przepis, liczba porcji.

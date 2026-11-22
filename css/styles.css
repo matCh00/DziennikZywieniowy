@@ -310,7 +310,7 @@ body[data-profile="female"] .avatar.female{background:#f9e5ef;color:#c65b91}body
 .add-form-grid .add-form-wide{grid-column:1/-1}
 .add-form-grid input,.add-form-grid select{width:100%;min-width:0;padding:9px;font-size:13px}
 
-/* Plan tygodnia: ten sam układ nagłówka i sekcji co „Dania” i „Produkty”. */
+/* Plan: ten sam układ nagłówka i sekcji co „Dania” i „Produkty”. */
 .week-hero{margin:4px 0 14px}
 .week-hero>div{min-width:0;max-width:760px}
 .week-hero h1{font:800 clamp(23px,3vw,31px) Manrope,sans-serif;letter-spacing:-.05em;margin:0}
