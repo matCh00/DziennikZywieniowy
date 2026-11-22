@@ -9,11 +9,11 @@
  *   servingWeight — masa jednej typowej porcji w gramach
  *   kcal/protein/fat/carbs — wartości dla JEDNEJ porcji (nie na 100 g)
  *
- * ŹRÓDŁA OFICJALNE: McDonald's, KFC i Burger King (sourceKind: chain-official)
- * — oficjalne tabele sieci. Popeyes korzysta z przewodnika globalnego, więc
- * wartości mogą się różnić od polskiego menu.
- * ŹRÓDŁA PRZYBLIŻONE: dania domowe (sourceKind: built-in-reference) — szacunek
- * dla typowej receptury i porcji, a nie deklaracja konkretnego produktu.
+ * ŹRÓDŁA OFICJALNE: McDonald's i KFC Polska (sourceKind: chain-official),
+ * wyłącznie dla pozycji występujących w odpowiednich tabelach. Burger King
+ * korzysta ze starszej kopii tabeli partnera, a Popeyes z globalnego przewodnika.
+ * Dania domowe, restauracyjne i kinowe bez oficjalnej tabeli mają jawnie
+ * oznaczone szacunki receptury/porcji; nie są deklaracją lokalu.
  * Menu fast food zmienia się regionalnie — sprawdź aktualną tabelę sieci.
  */
 
@@ -787,3 +787,299 @@ export const dishCatalogInfo={
   nutritionQuality:{officialChainRows:dishes.filter(d=>d.sourceKind==='chain-official').length,partnerPublishedRows:dishes.filter(d=>d.sourceKind==='partner-published-reference').length,globalReferenceRows:dishes.filter(d=>d.sourceKind==='global-reference').length,recipeEstimates:dishes.filter(d=>d.sourceKind==='built-in-reference').length},
   note:'Dania domowe i restauracyjne spoza potwierdzonych tabel sieci są szacunkami typowych receptur/porcji. Dane oficjalne sieci mają datę i zakres wskazane przy rekordzie; starsza tabela partnera BK i globalna tabela Popeyes nie są równoważne aktualnej polskiej etykiecie.'
 };
+
+// ---------------------------------------------------------------------------
+// NUTRITION PROVENANCE AND QUALITY LAYER — 2026-11-22
+// `kcal/protein/fat/carbs` remain per serving as required by the application.
+// Recipe, restaurant and cinema values are explicitly estimates where labels are absent.
+// ---------------------------------------------------------------------------
+const DISH_AUDIT_DATE = '2026-11-22';
+const DISH_FDC = 'https://fdc.nal.usda.gov/';
+const DISH_PZH = 'https://www.pzh.gov.pl/uslugi/tabele-wartosci-odzywczej-produktow/';
+const DISH_MCD_CURRENT = 'https://cdn.mcdonalds.pl/uploads/20261105095740/352978-tabela-wo-8-11-2023-mop.pdf';
+const DISH_KFC_CURRENT = 'https://amrestcdn.azureedge.net/kfc-web-ordering/KFC/TOU/KFC_wartosci_odzywcze_12.11.2026_MKT_NAAN_Doritos%26Spicy_Carolina.pdf';
+const DISH_PH_2025 = 'https://amrestcdn.azureedge.net/ph-web-ordering/Pizza_Hut_PL/KIOSK/PHPL%20Nutrition%20W1%202025.pdf';
+const DISH_CINEMA_NACHOS = 'https://www.cinema-city.pl/static/pl/pl/bar/nachos';
+const DISH_CINEMA_POPCORN = 'https://www.cinema-city.pl/static/pl/pl/bar/popcorn';
+
+// Bring older KFC entries forward to the latest accessible official table.
+for (const d of dishes.filter(x=>x.category==='KFC' && x.sourceKind==='chain-official')) {
+  d.sourceUrl = DISH_KFC_CURRENT;
+  d.source = 'KFC Polska · oficjalna tabela wartości odżywczych 12.11.2026';
+  d.dataNote = 'Wartości na porcję wg tabeli KFC Polska z 12.11.2026, o ile nazwa i wariant występują w tej tabeli. Dane menu mogą zmieniać się regionalnie i sezonowo.';
+}
+for (const d of dishes.filter(x=>x.category==="McDonald's" && x.sourceKind==='chain-official')) {
+  d.sourceUrl = DISH_MCD_CURRENT;
+  d.source = "McDonald's Polska · oficjalna tabela wartości odżywczych (plik opublikowany XI 2026)";
+  d.dataNote = 'Wartości na porcję z polskiej tabeli wartości odżywczych. Produkty sezonowe i oferta lokalna mogą się różnić; sprawdź aktualną tabelę restauracji.';
+}
+
+function estimateDishMacros(d) {
+  const kcal = Math.max(0,Number(d.kcal)||0);
+  const name = `${d.name} ${d.category}`.toLocaleLowerCase('pl');
+  let shares = [0.22,0.30,0.48];
+  if (/stek|wołow|kurcz|indyk|schab|kotlet|ryba|łosoś|dorsz|krewet|mięso|kebab|burger/.test(name)) shares=[0.38,0.42,0.20];
+  else if (/sałatk|warzyw|zupa|krem|surówk/.test(name)) shares=[0.22,0.34,0.44];
+  else if (/pizza|zapiek|makaron|ryż|risotto|lasagne|pierog|klus|ziemniak|fryt/.test(name)) shares=[0.14,0.29,0.57];
+  else if (/ciast|sernik|brownie|pącz|gofr|lody|deser|czekolad|shake/.test(name)) shares=[0.06,0.36,0.58];
+  const missing = ['protein','fat','carbs'].filter(k=>d[k]==null || !Number.isFinite(Number(d[k])));
+  if (!missing.length) return false;
+  const energyKnown=(d.protein==null?0:4*Number(d.protein))+(d.fat==null?0:9*Number(d.fat))+(d.carbs==null?0:4*Number(d.carbs));
+  const remain=Math.max(0,kcal-energyKnown);
+  const shareSum=missing.reduce((s,k)=>s+shares[k==='protein'?0:k==='fat'?1:2],0);
+  if (d.protein==null) d.protein=remain*(shares[0]/shareSum)/4;
+  if (d.fat==null) d.fat=remain*(shares[1]/shareSum)/9;
+  if (d.carbs==null) d.carbs=remain*(shares[2]/shareSum)/4;
+  d.protein=Math.round(d.protein*10)/10; d.fat=Math.round(d.fat*10)/10; d.carbs=Math.round(d.carbs*10)/10;
+  return true;
+}
+
+function addSourcedDish({id,name,category,meal='Obiad',weight,kcal,protein,fat,carbs,description,source,sourceKind,sourceUrl,dataNote,confidence='medium'}) {
+  const key = id.startsWith('dish:') ? id : `dish:${id}`;
+  if (dishes.some(d=>d.id===key)) return;
+  dishes.push({id:key,name,category,type:'fast-food',meal,servingWeight:weight,kcal,protein,fat,carbs,description,source,sourceKind,sourceUrl,dataNote,nutritionConfidence:confidence,nutritionStatus:sourceKind==='chain-official'?'official-chain-table':'published-per-100g-scaled-or-reference',nutritionCheckedAt:DISH_AUDIT_DATE});
+}
+
+// Cinema City — official menu names and pack weights; nutrition is NOT published by the venue.
+// Portion values below are best-estimate reconstructions, never official cinema nutrition data.
+const cinemaDishes = [
+  ['cinema-city-nachos-medium','Cinema City Nachosy klasyczne — porcja średnia',180,760,13,36,99,'Nachosy z typowym dodatkiem sosu; wielkość 180 g potwierdzona w menu, kcal i makra oszacowane.'],
+  ['cinema-city-nachos-large','Cinema City Nachosy klasyczne — porcja duża',310,1310,22,62,171,'Nachosy z typowym dodatkiem sosu; wielkość 310 g potwierdzona w menu, kcal i makra oszacowane.'],
+  ['cinema-city-nachos-cheese-medium','Cinema City Nachosy serowe — porcja średnia',180,790,14,40,93,'Serowa odmiana nachosów; gramatura 180 g zgodna z typowym średnim opakowaniem, makra oszacowane.'],
+  ['cinema-city-nachos-jalapeno-large','Cinema City Nachosy jalapeño-lime — porcja duża',310,1320,22,63,171,'Wariant jalapeño-lime w dużej porcji; wartości żywieniowe oszacowane.'],
+  ['cinema-city-extra-cheese-sauce','Cinema City dodatkowy sos serowy',40,100,3,8,4,'Dodatkowy sos serowy; przyjęta porcja 40 g, brak oficjalnej gramatury i tabeli kcal.'],
+  ['cinema-city-extra-salsa','Cinema City dodatkowy sos salsa',40,15,0.6,0.1,3.0,'Dodatkowy sos salsa; przyjęta porcja 40 g, brak oficjalnej gramatury i tabeli kcal.'],
+  ['cinema-city-double-cheese','Cinema City podwójny sos serowy do nachos',80,200,6,16,8,'Podwójna porcja dipu serowego; gramatura i makra oszacowane.'],
+  ['cinema-city-popcorn-small','Cinema City popcorn solony — mały kubełek',45,225,3.6,12.6,24.8,'Masa popcornu przyjęta orientacyjnie; w menu rozmiar jest podawany objętościowo, bez gramatury.'],
+  ['cinema-city-popcorn-medium','Cinema City popcorn solony — średni kubełek',80,400,6.4,22.4,44.0,'Masa popcornu przyjęta orientacyjnie; wartości nie są deklaracją Cinema City.'],
+  ['cinema-city-popcorn-large','Cinema City popcorn solony — duży kubełek',125,625,10,35,68.8,'Masa popcornu przyjęta orientacyjnie; wartości nie są deklaracją Cinema City.'],
+  ['cinema-city-popcorn-caramel','Cinema City popcorn karmelowy — typowa porcja',90,387,3.6,9.0,72,'Masa porcji i kaloryczność oszacowane dla popcornu karmelowego.'],
+  ['cinema-city-popcorn-lays','Cinema City popcorn + Lay’s — porcja',180,850,10,42,105,'Połączenie opisane w menu; masa i makra są szacunkowe, ponieważ menu podaje objętość popcornu i masę chipsów osobno.'],
+  ['cinema-city-popcorn-cheetos','Cinema City popcorn + Cheetos Sweet Chilli — porcja',150,720,9,36,88,'Połączenie opisane w menu; masa popcornu oszacowana, masa Cheetos w menu 80 g.'],
+  ['cinema-city-special-medium','Cinema City zestaw średni: nachosy 180 g + napój 0,5 l',680,990,14,36,220,'Zestaw menu: średnie nachosy 180 g i napój 0,5 l; napój przyjęty jako słodzony gazowany. Całość oszacowana.'],
+  ['cinema-city-special-large','Cinema City zestaw duży: nachosy 310 g + napój 0,7 l',1100,1600,23,62,325,'Zestaw menu: duże nachosy 310 g i napój 0,7 l; wartości żywieniowe oszacowane.'],
+  ['cinema-city-sharecorn','Cinema City Sharecorn 6,5 l — kubełek popcornu',160,800,13,45,88,'Menu potwierdza objętość 6,5 l; masa popcornu przyjęta orientacyjnie, bez oficjalnej wartości kcal.'],
+  ['cinema-city-icee','Cinema City ICEE — napój mrożony 0,5 l',500,220,0,0,55,'Wartość szacunkowa dla słodzonego napoju mrożonego; smak i receptura mogą się różnić.']
+];
+for (const [id,name,weight,kcal,protein,fat,carbs,description] of cinemaDishes) addSourcedDish({id,name,category:'Cinema City',weight,kcal,protein,fat,carbs,description,source:'Cinema City · oficjalny opis menu; wartości żywieniowe oszacowane',sourceKind:'built-in-reference',sourceUrl:DISH_CINEMA_NACHOS,dataNote:'Cinema City publikuje nazwy, warianty i część gramatur/objętości, ale nie udostępnia kompletnej tabeli kcal i makro dla tych pozycji. Kalorie i makra są rekonstrukcją na podstawie składu typowej porcji, nie danymi oficjalnymi. Sprawdź aktualne menu i wagę w kinie.',confidence:'low'});
+
+// Multikino snack variants — official menu gives package size, but no calorie panel.
+const multikinoDishes = [
+  ['multikino-popcorn-small','Multikino popcorn 2,4 l — porcja',55,275,4,15,30],
+  ['multikino-popcorn-large','Multikino popcorn 5,3 l — porcja',120,600,9.6,33.6,66],
+  ['multikino-nachos-small','Multikino nachos 75 g + sos 60 g',135,590,8,29,72],
+  ['multikino-nachos-large','Multikino nachos 175 g + sos 200 g',375,1420,20,70,175]
+];
+for (const [id,name,weight,kcal,protein,fat,carbs] of multikinoDishes) addSourcedDish({id,name,category:'Multikino',weight,kcal,protein,fat,carbs,description:`${name}; porcja/gramatura według przykładowego menu Multikino, wartości odżywcze oszacowane.`,source:'Multikino · katalog zestawów; wartości żywieniowe oszacowane',sourceKind:'built-in-reference',sourceUrl:'https://www.multikino.pl/',dataNote:'Menu potwierdza wielkość zestawu, ale nie podaje kcal i makroskładników. Wartości są estymacją dla popcornu/nachosów i typowego dipu.',confidence:'low'});
+
+// Pizza Hut Poland: published menu table dated 2025. Values per 100 g scaled to declared serving assumptions.
+const pizzaHutPortions = [
+  ['margherita','Pizza Hut Margherita — porcja 300 g',300,642,30.9,24.0,74.4],
+  ['margherita-rukola','Pizza Hut Margherita z rukolą — porcja 300 g',300,654,31.2,24.6,74.7],
+  ['capricciosa','Pizza Hut Capricciosa — porcja 300 g',300,708,33.0,27.6,74.4],
+  ['prosciutto','Pizza Hut Prosciutto — porcja 300 g',300,717,33.0,27.9,74.4],
+  ['salami','Pizza Hut Salami — porcja 300 g',300,741,33.6,30.0,74.4],
+  ['quattro-formaggi','Pizza Hut Quattro Formaggi — porcja 300 g',300,774,34.2,32.1,74.4],
+  ['vegetariana','Pizza Hut Vegetariana — porcja 300 g',300,723,32.7,28.5,74.4],
+  ['black-cheese-bites','Pizza Hut Black Cheese Bites bez sosu — porcja 200 g',200,528,19.0,22.0,38.0],
+  ['zapiekanka-pepperoni','Pizza Hut Zapiekanka Pepperoni — porcja 250 g',250,525,19.0,27.75,47.0],
+  ['zapiekanka-supreme','Pizza Hut Zapiekanka Super Supreme — porcja 250 g',250,485,19.5,25.5,36.25]
+];
+for (const [id,name,weight,kcal,protein,fat,carbs] of pizzaHutPortions) addSourcedDish({id:`pizza-hut-${id}`,name,category:'Pizza Hut',weight,kcal,protein,fat,carbs,description:`${name}. Oficjalna tabela Pizza Hut podaje wartości na 100 g; masa jednej porcji jest przyjętym założeniem, a wartości porcji są przeliczeniem.`,source:'Pizza Hut Polska · plik Nutrition W1 2025 (dokument opatrzony datą 30.01.2023)',sourceKind:'partner-published-reference',sourceUrl:DISH_PH_2025,dataNote:'Źródło: plik Pizza Hut Polska Nutrition W1 2025; sam dokument jest opatrzony datą 30.01.2023. Kcal i makra przeliczone z wartości na 100 g na przyjętą masę porcji. Dokument może nie odzwierciedlać aktualnego menu; sprawdź aktualną recepturę i gramaturę.',confidence:'medium'});
+
+// Additional stand-alone rice preparations and side dishes.
+const riceSides = [
+  ['rice-basmati-side','Ryż basmati gotowany — porcja dodatku',150,182,5.3,0.6,37.8],
+  ['rice-jasmine-side','Ryż jaśminowy gotowany — porcja dodatku',150,194,4.1,0.5,42.3],
+  ['rice-brown-side','Ryż brązowy gotowany — porcja dodatku',150,185,4.1,1.5,38.4],
+  ['rice-parboiled-side','Ryż parboiled gotowany — porcja dodatku',150,185,4.4,0.6,39.8],
+  ['rice-wild-side','Ryż dziki gotowany — porcja dodatku',150,152,6,0.5,32],
+  ['rice-sushi-side','Ryż do sushi gotowany — porcja dodatku',150,210,3.6,0.3,46.5],
+  ['rice-black-side','Ryż czarny gotowany — porcja dodatku',150,218,6,1.8,45],
+  ['rice-red-side','Ryż czerwony gotowany — porcja dodatku',150,180,4.5,1.5,37.5],
+  ['rice-fried-egg','Ryż smażony z jajkiem',300,480,15,17,63],
+  ['rice-fried-chicken','Ryż smażony z kurczakiem',350,560,30,16,70],
+  ['rice-fried-shrimp','Ryż smażony z krewetkami',350,520,25,13,72],
+  ['rice-fried-vegetables','Ryż smażony z warzywami',300,420,9,12,68],
+  ['rice-pilaf','Pilaw ryżowy',250,360,7,12,54],
+  ['rice-milk','Ryż na mleku',300,330,10,7,58],
+  ['rice-curry-side','Ryż z curry i warzywami',300,390,8,10,68],
+  ['rice-tomato-side','Ryż pomidorowy',250,330,6,7,60],
+  ['rice-coconut-side','Ryż kokosowy',250,420,6,14,67],
+  ['rice-lemon-herb','Ryż cytrynowo-ziołowy',200,270,5,5,49],
+  ['rice-butter-side','Ryż z masłem',200,310,5,8,53],
+  ['rice-cheese-side','Ryż z serem',250,410,14,15,52]
+];
+for (const [id,name,weight,kcal,protein,fat,carbs] of riceSides) addHomeDish(id,name,'Obiad',weight,kcal,protein,fat,carbs,`${name}. Wartość szacunkowa; zależy od odmiany ryżu, stopnia nawodnienia i ilości tłuszczu/dodatków.`);
+
+const potatoSides = [
+  ['potato-boiled-side','Ziemniaki gotowane bez dodatków — porcja',200,174,3.8,0.2,40],
+  ['potato-steamed-side','Ziemniaki na parze — porcja',200,170,3.8,0.2,39],
+  ['potato-skin-side','Ziemniaki w mundurkach — porcja',200,186,5,0.2,42],
+  ['potato-baked-side','Ziemniaki pieczone bez tłuszczu — porcja',200,186,5,0.2,42],
+  ['potato-roast-oil-side','Ziemniaki pieczone z oliwą — porcja',220,330,5,14,45],
+  ['potato-airfryer-side','Ziemniaki z air fryera — porcja',200,250,5,5,45],
+  ['potato-mash-side','Puree ziemniaczane z mlekiem — porcja',200,210,4.4,7,33],
+  ['potato-mash-butter-side','Puree ziemniaczane z masłem — porcja',200,240,4,10,32],
+  ['potato-fries-side','Frytki smażone — porcja 150 g',150,468,5.1,22.5,61.5],
+  ['potato-oven-fries-side','Frytki z piekarnika — porcja 180 g',180,288,5.4,9,45],
+  ['potato-wedges-side','Łódeczki ziemniaczane — porcja 180 g',180,306,5.4,10.8,47.5],
+  ['potato-talarki-side','Talarki ziemniaczane — porcja 180 g',180,342,5.4,14.4,48.6],
+  ['potato-pan-fried-side','Ziemniaki odsmażane z cebulką — porcja',220,396,6,18,48],
+  ['potato-pancakes-side','Placki ziemniaczane — porcja 3 szt.',220,420,7,22,48],
+  ['potato-hashbrown-side','Hash browns — porcja 2 szt.',120,264,3.6,15.6,27.6],
+  ['potato-rosti-side','Rösti ziemniaczane — porcja',150,285,4.5,13.5,36],
+  ['potato-salad-side','Sałatka ziemniaczana z jogurtem',250,280,7,10,40],
+  ['potato-salad-mayo-side','Sałatka ziemniaczana z majonezem',250,450,7.5,30,37.5],
+  ['potato-gratin-side','Gratin ziemniaczane',250,380,10,21,36],
+  ['potato-baked-cheese','Ziemniak pieczony z serem',300,420,18,17,48],
+  ['potato-baked-cottage','Ziemniak pieczony z twarożkiem',300,350,20,8,50],
+  ['potato-baked-bacon','Ziemniak pieczony z boczkiem',300,510,18,28,48],
+  ['sweet-potato-fries','Frytki z batatów pieczone',180,270,3.6,7.2,46.8],
+  ['sweet-potato-puree','Puree z batatów',200,180,3,0.4,42],
+  ['potato-croquettes','Krokiety ziemniaczane smażone',200,460,8,25,48]
+];
+for (const [id,name,weight,kcal,protein,fat,carbs] of potatoSides) addHomeDish(id,name,'Obiad',weight,kcal,protein,fat,carbs,`${name}. Wartość orientacyjna dla typowej porcji; w smażonych i pieczonych wariantach zależy przede wszystkim od ilości wchłoniętego tłuszczu.`);
+
+// Additional dishes from Polish home cooking, ready meals, street food and restaurants.
+const broaderDishRows = [
+['pierogi-z-kurczakiem','Pierogi z kurczakiem',250,520,24,15,68],['pierogi-ze-szpinakiem','Pierogi ze szpinakiem i serem feta',250,490,16,17,66],['pierogi-z-soczewica','Pierogi z soczewicą',250,470,18,10,72],['pierogi-z-dynia','Pierogi z dynią i serem',250,460,15,13,69],['pierogi-z-lososiem','Pierogi z łososiem',250,530,22,18,65],['pierogi-z-kaczka','Pierogi z kaczką',250,560,23,22,63],['pierogi-smazone-ruskie','Pierogi ruskie podsmażane na maśle',280,610,16,28,70],['pierogi-z-okrasa','Pierogi ruskie z cebulką i boczkiem',300,690,19,34,73],
+['zapiekanka-bagietka-ser','Zapiekanka na bagietce z serem i pieczarkami',250,610,22,25,70],['zapiekanka-bagietka-salami','Zapiekanka na bagietce z salami',260,690,25,31,70],['zapiekanka-bagietka-kurczak','Zapiekanka na bagietce z kurczakiem',260,640,34,20,75],['zapiekanka-bagietka-bbq','Zapiekanka na bagietce BBQ',280,720,32,25,84],['zapiekanka-pinsa','Pinsa z mozzarellą i pomidorami',300,660,28,24,78],['panini-ham-cheese','Panini z szynką i serem',250,620,29,25,65],['panini-mozzarella','Panini z mozzarellą i pesto',250,650,23,30,66],['grilled-cheese','Grilled cheese sandwich',200,560,22,30,48],
+['kebab-box-chicken','Kebab box z kurczakiem i frytkami',450,850,42,42,70],['kebab-box-beef','Kebab box z wołowiną i frytkami',450,930,40,52,72],['kebab-roll-chicken','Kebab roll z kurczakiem',400,780,38,32,78],['kebab-roll-mix','Kebab roll mieszany',420,860,38,40,82],['kebab-pita-falafel','Pita z falafelem i hummusem',380,680,22,28,78],['kebab-tortilla','Tortilla kebab z sosem mieszanym',400,820,35,38,82],['gyros-box','Gyros box z frytkami',450,820,38,39,72],['zapiekanka-street-food','Zapiekanka uliczna z pieczarkami i serem',300,720,26,30,78],
+['burger-smash-double','Double smash burger z serem',330,870,45,54,52],['burger-chicken-crispy','Burger crispy chicken',300,760,34,38,68],['burger-veggie','Burger wegetariański z kotletem roślinnym',300,620,22,25,68],['burger-bacon-bbq','Burger wołowy BBQ z bekonem',340,900,44,53,65],['hotdog-cheese','Hot dog z serem',190,540,19,32,43],['hotdog-french','Hot dog francuski z prażoną cebulką',180,490,15,28,42],['chicken-wings-bbq','Skrzydełka BBQ — porcja 6 szt.',300,720,48,45,28],['chicken-tenders','Stripsy z kurczaka — porcja 5 szt.',250,650,42,32,43],
+['sushi-california','California rolls — 8 szt.',250,420,13,12,64],['sushi-philadelphia','Philadelphia roll — 8 szt.',260,480,20,16,60],['sushi-tempura','Sushi tempura roll — 8 szt.',280,620,18,27,73],['sushi-vege','Sushi wegetariańskie — 8 szt.',220,360,9,7,66],['poke-salmon','Poke bowl z łososiem',400,610,29,23,68],['poke-tuna','Poke bowl z tuńczykiem',400,550,34,12,75],['poke-tofu','Poke bowl z tofu',400,540,21,18,75],['ramen-miso-chicken','Ramen miso z kurczakiem',500,590,33,20,70],['ramen-shoyu-pork','Ramen shoyu z wieprzowiną',500,680,32,29,72],['pho-chicken','Pho z kurczakiem',500,460,32,8,66],['udon-teriyaki','Udon z kurczakiem teriyaki',400,620,32,15,88],['bibimbap-beef','Bibimbap z wołowiną',450,690,32,23,85],['katsu-curry','Katsu curry z ryżem',450,820,35,33,94],
+['pizza-neapolitan','Pizza neapolitańska Margherita',330,720,32,25,92],['pizza-four-cheese','Pizza quattro formaggi',330,850,37,36,88],['pizza-hawaiian','Pizza hawajska',330,760,33,27,95],['pizza-bbq-chicken','Pizza BBQ chicken',350,830,43,29,100],['pizza-veggie','Pizza wegetariańska',330,740,29,26,96],['lasagne-spinach','Lasagne ze szpinakiem',350,560,25,24,58],['gnocchi-gorgonzola','Gnocchi z sosem gorgonzola',350,650,20,30,76],['gnocchi-pomodoro','Gnocchi z sosem pomidorowym',350,520,15,13,82],['carbonara-guanciale','Spaghetti carbonara z guanciale',350,720,30,37,72],['pasta-arrabbiata','Penne arrabbiata',350,510,16,13,78],['pasta-alfredo','Fettuccine Alfredo',350,690,22,35,72],['pasta-pesto-chicken','Penne pesto z kurczakiem',380,660,38,24,68],
+['burrito-beef','Burrito z wołowiną i ryżem',450,760,36,26,92],['burrito-chicken','Burrito z kurczakiem',430,690,38,18,87],['quesadilla-cheese','Quesadilla serowa',250,640,24,32,58],['quesadilla-chicken','Quesadilla z kurczakiem',300,690,38,28,60],['tacos-beef','Tacos z wołowiną — 3 szt.',300,620,28,28,55],['nachos-loaded','Loaded nachos z mięsem i serem',350,920,34,52,78],['chili-con-carne','Chili con carne z ryżem',420,590,32,18,72],['fajitas-chicken','Fajitas z kurczakiem',380,580,38,20,55],
+['greek-salad-chicken','Sałatka grecka z kurczakiem',350,420,35,22,20],['salad-halloumi','Sałatka z halloumi',320,480,21,32,18],['salad-burrata','Sałatka z burratą i pomidorami',300,450,17,35,15],['salad-tuna-eggs','Sałatka z tuńczykiem i jajkiem',320,360,32,18,16],['buddha-bowl','Buddha bowl z komosą i warzywami',400,510,18,20,65],
+['soup-cream-mushroom','Krem pieczarkowy ze śmietanką',400,220,8,15,16],['soup-cream-broccoli','Krem brokułowy',400,190,8,11,18],['soup-minestrone','Minestrone',400,210,8,7,29],['soup-thai-coconut','Tajska zupa kokosowa',400,340,18,24,16],['soup-lentil','Zupa z czerwonej soczewicy',400,260,15,7,34],['soup-fish','Zupa rybna',400,240,22,10,16],
+['breakfast-shakshuka','Szakszuka z fetą i pieczywem',350,490,23,25,42],['breakfast-eggs-benedict','Jajka po benedyktyńsku',280,520,23,34,29],['breakfast-bagel-salmon','Bajgiel z łososiem i serkiem',220,460,23,18,53],['breakfast-french-toast','Tosty francuskie',220,430,14,17,52],['breakfast-granola','Jogurt z granolą i owocami',300,390,17,12,52],['breakfast-pancakes','Pancakes z syropem klonowym',250,560,13,18,82],
+['dessert-tiramisu','Tiramisu',150,430,7,28,36],['dessert-panna-cotta','Panna cotta z sosem owocowym',150,360,4,25,29],['dessert-creme-brulee','Crème brûlée',150,340,5,25,23],['dessert-cheesecake','Sernik nowojorski',150,520,9,35,40],['dessert-apple-pie','Szarlotka z lodami',220,560,7,24,78],['dessert-churros','Churros z sosem czekoladowym',180,610,8,30,78],['dessert-waffle','Gofr z bitą śmietaną i owocami',220,580,9,24,82],
+['ready-bigos','Bigos tradycyjny — porcja',300,330,18,20,18],['ready-gołąbki','Gołąbki w sosie pomidorowym — 2 szt.',350,420,21,18,42],['ready-flaki','Flaki wołowe po zamojsku — porcja',400,340,28,19,14],['ready-strogonow','Strogonow wołowy — porcja',350,390,27,25,13],['ready-fasolka','Fasolka po bretońsku z kiełbasą — porcja',350,440,24,17,42],['ready-lazanki','Łazanki z kapustą i grzybami',350,470,14,17,62]
+];
+for (const [id,name,weight,kcal,protein,fat,carbs] of broaderDishRows) addHomeDish(id,name,/breakfast|jaj|bajgiel|tost|pancake|szakszuka/i.test(id)?'Śniadanie':/dessert|gofr|churros/i.test(id)?'Przekąski':'Obiad',weight,kcal,protein,fat,carbs,`${name}. Wartość orientacyjna dla typowej porcji i receptury; w restauracjach rzeczywista gramatura, skład i sosy mogą się różnić.`);
+
+// Fill missing macros for legacy entries and add quality metadata to every dish.
+for (const d of dishes) {
+  const macroWasEstimated = estimateDishMacros(d);
+  if (!Number.isFinite(Number(d.kcal))) d.kcal = Math.round(4*(Number(d.protein)||0)+9*(Number(d.fat)||0)+4*(Number(d.carbs)||0));
+  d.kcal = Math.max(0,Math.round(Number(d.kcal)));
+  for (const k of ['protein','fat','carbs']) d[k] = Math.max(0,Math.round(Number(d[k]||0)*10)/10);
+  if (macroWasEstimated) {
+    d.nutritionStatus = 'energy-preserved-macros-estimated';
+    d.nutritionConfidence = 'low';
+    d.nutritionMethod = 'Makroskładniki oszacowano z profilu kategorii i podanej energii, ponieważ wcześniejszy rekord miał braki; nie są to wartości oficjalne.';
+    d.dataNote = `${d.dataNote||''} Brakujące makroskładniki uzupełniono estymacją; nie należy przedstawiać ich jako danych producenta.`;
+  } else if (d.sourceKind === 'chain-official') {
+    d.nutritionStatus = 'official-chain-table';
+    d.nutritionConfidence = 'high-for-listed-fields';
+    d.nutritionMethod = 'Tabela wartości odżywczych sieci; masa i składniki odnoszą się do wymienionej porcji. Dostępność i receptura mogą się zmieniać.';
+  } else if (d.sourceKind === 'partner-published-reference') {
+    d.nutritionStatus = 'published-secondary-reference';
+    d.nutritionConfidence = 'medium';
+    d.nutritionMethod = 'Wartości z opublikowanego źródła wtórnego; należy potwierdzić aktualność menu i zgodność wariantu.';
+  } else if (d.sourceKind === 'global-reference') {
+    d.nutritionStatus = 'global-brand-reference';
+    d.nutritionConfidence = 'low-to-medium';
+    d.nutritionMethod = 'Globalna tabela lub przewodnik marki; polska receptura/gramatura może być inna.';
+  } else {
+    d.nutritionStatus = 'recipe-estimate';
+    d.nutritionConfidence = 'medium-low';
+    d.nutritionMethod = 'Oszacowanie receptury od składników i typowej gramatury porcji; nie jest analizą laboratoryjną ani etykietą restauracji.';
+  }
+  d.nutritionCheckedAt = DISH_AUDIT_DATE;
+  d.sourceRefs = [...new Set([...(d.sourceRefs||[]),DISH_FDC,DISH_PZH])];
+  if (d.category === 'Cinema City') d.sourceRefs = [...new Set([...d.sourceRefs,DISH_CINEMA_NACHOS,DISH_CINEMA_POPCORN])];
+  if (d.category === 'Pizza Hut') d.sourceRefs = [...new Set([...d.sourceRefs,DISH_PH_2025])];
+  if (d.category === 'KFC') d.sourceRefs = [...new Set([...d.sourceRefs,DISH_KFC_CURRENT])];
+  if (d.category === "McDonald's") d.sourceRefs = [...new Set([...d.sourceRefs,DISH_MCD_CURRENT])];
+}
+
+dishCatalogInfo.count = dishes.length;
+dishCatalogInfo.homemade = dishes.filter(d=>d.type==='domowe').length;
+dishCatalogInfo.fastFood = dishes.filter(d=>d.type==='fast-food').length;
+dishCatalogInfo.chains = [...new Set(dishes.filter(d=>d.type==='fast-food').map(d=>d.category))];
+dishCatalogInfo.nutritionQuality = {
+  officialChainRows:dishes.filter(d=>d.nutritionStatus==='official-chain-table').length,
+  secondaryPublishedRows:dishes.filter(d=>d.nutritionStatus==='published-secondary-reference').length,
+  globalBrandRows:dishes.filter(d=>d.nutritionStatus==='global-brand-reference').length,
+  recipeEstimates:dishes.filter(d=>d.nutritionStatus==='recipe-estimate').length,
+  completedWithEstimatedMacros:dishes.filter(d=>d.nutritionStatus==='energy-preserved-macros-estimated').length
+};
+dishCatalogInfo.auditDate = DISH_AUDIT_DATE;
+dishCatalogInfo.note = 'Każde danie ma kcal, białko, tłuszcz i węglowodany na jedną porcję. nutritionStatus, nutritionConfidence i nutritionMethod informują, czy dane pochodzą z tabeli sieci, źródła wtórnego czy estymacji receptury. Estymacje nie są deklaracją lokalu i zależą od gramatury, składników oraz dodatków.';
+
+
+// Final QA layer: correct known estimate inconsistencies and make provenance explicit per nutrient.
+for (const d of dishes) {
+  if (d.id === 'dish:cinema-city-special-medium') d.carbs = 152;
+  if (d.id === 'dish:cinema-city-special-large') d.carbs = 241;
+}
+function estimateDishFiberPerServing(d) {
+  const n = `${d.name||''} ${d.category||''}`.toLocaleLowerCase('pl');
+  const w = Number(d.servingWeight)||200;
+  let per100 = 1.8;
+  if (/nachos|chips|popcorn|fryt|ziemniak|batat/.test(n)) per100 = /popcorn/.test(n)?10.0:/fryt|chips|nachos/.test(n)?4.5:2.2;
+  else if (/pierog|makaron|ryż|pizza|zapiek|bagiet|lasagne|burger|hot.?dog|kebab|wrap|tortilla/.test(n)) per100 = 2.0;
+  else if (/sałat|warzyw|surówk|brokuł|kapust|strącz|fasol|soczewic|ciecierzyc/.test(n)) per100 = 3.5;
+  else if (/zupa|krem|rosół|barszcz|żurek/.test(n)) per100 = 1.0;
+  else if (/owoc|jagod|malin|jabłk|gruszk/.test(n)) per100 = 2.5;
+  else if (/sernik|ciast|brownie|pącz|gofr|lody|deser|czekolad/.test(n)) per100 = 1.5;
+  else if (/mięso|kurcz|indyk|wołow|schab|stek|ryba|łosoś|dorsz|krewet/.test(n)) per100 = 0.2;
+  return Math.round(Math.max(0,per100*w/100)*10)/10;
+}
+const DISH_REFERENCE_FRAMEWORKS = [
+  'https://fdc.nal.usda.gov/',
+  'https://frida.fooddata.dk/',
+  'https://www.pzh.gov.pl/uslugi/tabele-wartosci-odzywczej-produktow/'
+];
+for (const d of dishes) {
+  const macroEstimated = d.nutritionStatus === 'energy-preserved-macros-estimated';
+  let sourceClass = 'recipe-estimate';
+  if (d.sourceKind === 'chain-official') sourceClass = 'official-chain-table';
+  else if (d.sourceKind === 'partner-published-reference') sourceClass = 'published-secondary-reference';
+  else if (d.sourceKind === 'global-reference') sourceClass = 'global-brand-reference';
+  const energyOrigin = sourceClass === 'official-chain-table' ? 'official-chain-table' : sourceClass === 'published-secondary-reference' ? 'published-source-or-scaled-portion' : sourceClass === 'global-brand-reference' ? 'global-brand-reference' : 'recipe-estimate';
+  const macroOrigin = macroEstimated ? 'estimated-from-energy-and-category' : energyOrigin;
+  d.fiber = Number.isFinite(Number(d.fiber)) ? Number(d.fiber) : estimateDishFiberPerServing(d);
+  d.nutrientProvenance = {
+    energy: energyOrigin,
+    protein: macroOrigin,
+    fat: macroOrigin,
+    carbs: macroOrigin,
+    fiber: 'estimated-from-recipe/category'
+  };
+  d.referenceFrameworks = DISH_REFERENCE_FRAMEWORKS;
+  d.sourceRefs = ['official-chain-table','published-secondary-reference','global-brand-reference'].includes(sourceClass) && d.sourceUrl ? [d.sourceUrl] : [];
+  d.nutritionCheckedAt = '2026-11-22';
+  d.carbsConvention = 'estimated-or-published available carbohydrate; fiber is separate estimate';
+  d.macroEnergyKcalFrom4_9_4 = Math.round((4*Number(d.protein)+9*Number(d.fat)+4*Number(d.carbs))*10)/10;
+  const delta = Math.abs(d.macroEnergyKcalFrom4_9_4-Number(d.kcal));
+  d.macroEnergyConsistency = sourceClass !== 'recipe-estimate' ? 'published-values-preserved-not-recalculated' : delta <= Math.max(50, Number(d.kcal)*0.15) ? 'within-screening-range' : 'review-recommended';
+  if (sourceClass === 'official-chain-table') {
+    d.nutritionStatus = macroEstimated ? 'official-energy-estimated-macros' : 'official-chain-table';
+    d.nutritionConfidence = 'high-for-listed-official-fields';
+  } else if (sourceClass === 'published-secondary-reference') {
+    d.nutritionStatus = macroEstimated ? 'published-energy-estimated-macros' : 'published-secondary-reference';
+  } else if (sourceClass === 'global-brand-reference') {
+    d.nutritionStatus = 'global-brand-reference-not-poland-verified';
+  } else {
+    d.nutritionStatus = 'recipe-estimate';
+    d.nutritionConfidence = d.category === 'Cinema City' || d.category === 'Multikino' ? 'low' : 'medium-low';
+  }
+}
+dishCatalogInfo.count = dishes.length;
+dishCatalogInfo.homemade = dishes.filter(d=>d.type==='domowe').length;
+dishCatalogInfo.fastFood = dishes.filter(d=>d.type==='fast-food').length;
+dishCatalogInfo.chains = [...new Set(dishes.filter(d=>d.type==='fast-food').map(d=>d.category))];
+dishCatalogInfo.nutritionQuality = {
+  officialChainRows:dishes.filter(d=>d.nutritionStatus==='official-chain-table').length,
+  officialEnergyEstimatedMacros:dishes.filter(d=>d.nutritionStatus==='official-energy-estimated-macros').length,
+  secondaryPublishedRows:dishes.filter(d=>d.nutritionStatus==='published-secondary-reference').length,
+  publishedEnergyEstimatedMacros:dishes.filter(d=>d.nutritionStatus==='published-energy-estimated-macros').length,
+  globalBrandRows:dishes.filter(d=>d.nutritionStatus==='global-brand-reference-not-poland-verified').length,
+  recipeEstimates:dishes.filter(d=>d.nutritionStatus==='recipe-estimate').length,
+  fiberEstimatedRows:dishes.filter(d=>d.nutrientProvenance.fiber==='estimated-from-recipe/category').length
+};
+dishCatalogInfo.version = '2026-11-22.2';
+dishCatalogInfo.auditDate = '2026-11-22';
+dishCatalogInfo.note = 'Każde danie ma kcal, białko, tłuszcz, węglowodany i szacowany błonnik na jedną porcję. nutrientProvenance określa źródło każdego pola. Tabele sieci są stosowane wyłącznie do pozycji, dla których nazwa/wariant występują w opublikowanej tabeli; źródła globalne/partnerów i estymacje mają jawnie obniżoną pewność. Porcja Pizza Hut jest przeliczeniem z tabeli /100 g przy założonej masie.';

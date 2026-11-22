@@ -1,3 +1,5 @@
+import { products } from './products.js';
+
 /**
  * FORMAT DANYCH — plany tygodniowe (uniwersalny, wspólny dla przykładów i planów użytkownika)
  * -----------------------------------------------------------------------------------------
@@ -15,9 +17,9 @@
  *                               a) odwołanie do dania z dishes.js:
  *                                  { dishId:'dish:...', servings:1.5 }
  *                                  (servings = liczba porcji dania, 1 = jedna porcja)
- *                               b) własna pozycja produktowa (bez dania):
- *                                  { name, grams, kcal100, protein100, fat100, carbs100 }
- *                                  (protein100/fat100/carbs100 mogą być null)
+ *                               b) pozycja produktowa: { productId, name, grams } — wartości
+ *                                  kcal/makro/błonnik są dziedziczone z products.js; stare
+ *                                  rekordy bez productId są automatycznie dopasowywane po nazwie.
  *   source      czytelny opis źródła
  *   sourceKind  'built-in-sample' dla przykładów
  *   dataNote    informacja o dokładności danych
@@ -282,3 +284,50 @@ export const planCatalogInfo = {
   samples: plans.filter(plan => plan.kind === 'sample').length,
   note: 'Przykładowe plany są tylko do odczytu. Pozycje odwołujące się do dań pobierają wartości z dishes.js; wartości zmieniają się wraz z aktualizacją dań. Pozycje produktowe z gramaturą wykorzystują podane kcal/100 g. Wartości szacunkowe nie zastępują etykiety produktu ani pomiaru dietetycznego.'
 };
+
+
+// Product-backed normalization for stand-alone plan items; values always inherit the offline catalog.
+const planNameKey = value => String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pl').replace(/[^a-z0-9]+/g,' ').trim();
+const planProductAliases = new Map([
+  [planNameKey('Tuńczyk odsączony'),'tuna'],
+  [planNameKey('Kefir naturalny'),'kefir'],
+  [planNameKey('Pierś z kurczaka, gotowana'),'chicken-cooked'],
+  [planNameKey('Ryż biały, gotowany'),'rice-cooked'],
+  [planNameKey('Brokuł, gotowany'),'broccoli-cooked'],
+  [planNameKey('Jajo kurze, całe'),'egg'],
+  [planNameKey('Twaróg półtłusty'),'cottage'],
+  [planNameKey('Chleb żytni'),'bread'],
+  [planNameKey('Wafle ryżowe naturalne'),'rice-cake'],
+]);
+const planProductByName = new Map(products.map(p=>[planNameKey(p.name),p]));
+for (const plan of plans) {
+  for (const day of plan.days||[]) for (const meal of day.meals||[]) for (const item of meal.items||[]) {
+    if (item.dishId) continue;
+    const wanted = planNameKey(item.name);
+    let product = null;
+    const mappedId = planProductAliases.get(wanted);
+    if (mappedId) product = products.find(p=>p.id===mappedId) || products.find(p=>p.id.endsWith(`:${mappedId}`));
+    if (!product) product = planProductByName.get(wanted) || null;
+    if (!product && wanted) product = products.find(p=>planNameKey(p.name).includes(wanted) || wanted.includes(planNameKey(p.name))) || null;
+    if (product) {
+      item.productId = product.id;
+      item.kcal100 = product.kcal100;
+      item.protein100 = product.protein100;
+      item.fat100 = product.fat100;
+      item.carbs100 = product.carbs100;
+      item.fiber100 = product.fiber100;
+      item.nutritionStatus = product.nutritionStatus;
+      item.nutrientProvenance = product.nutrientProvenance;
+      item.dataNote = product.dataNote;
+    } else {
+      item.nutritionStatus = item.nutritionStatus || 'legacy-plan-estimate';
+      item.nutrientProvenance = item.nutrientProvenance || {energy:'legacy-plan-estimate',protein:'unavailable-estimate',fat:'unavailable-estimate',carbs:'unavailable-estimate',fiber:'unavailable'};
+      item.dataNote = 'Pozycja planu bez bezpośredniego dopasowania w products.js; wartości pozostają dotychczasowym szacunkiem jadłospisu.';
+    }
+  }
+}
+Object.assign(planCatalogInfo, {
+  linkedProductItems: plans.flatMap(p=>p.days||[]).flatMap(d=>d.meals||[]).flatMap(m=>m.items||[]).filter(i=>i.productId).length,
+  unresolvedProductItems: plans.flatMap(p=>p.days||[]).flatMap(d=>d.meals||[]).flatMap(m=>m.items||[]).filter(i=>!i.dishId&&!i.productId).length,
+  note: 'Przykładowe plany są tylko do odczytu. Pozycje z dishId pobierają dane z dishes.js, a pozycje produktowe z productId pobierają kcal, makra i błonnik z products.js. Poziom wiarygodności i źródło każdego składnika są dziedziczone z katalogu nadrzędnego.'
+});

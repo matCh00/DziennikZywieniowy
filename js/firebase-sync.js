@@ -39,7 +39,10 @@ export async function initFirebaseClient(config){
           return {
             activeProfile:pr.activeProfile||'female',profiles:{female:f.profile||null,male:m.profile||null},
             logs:{female:f.logs||{},male:m.logs||{}},weights:{female:f.weights||[],male:m.weights||[]},
-            customProducts:Array.isArray(sh.customProducts)?sh.customProducts:[],recipes:Array.isArray(sh.recipes)?sh.recipes:[],plans:Array.isArray(sh.plans)?sh.plans:[],
+            customProducts:Array.isArray(sh.customProducts)?sh.customProducts:[],recipes:Array.isArray(sh.recipes)?sh.recipes:[],plans:Array.isArray(sh.plans)?sh.plans:[],vessels:Array.isArray(sh.vessels)?sh.vessels:[],
+            favorites:{products:Array.isArray(sh.favorites?.products)?sh.favorites.products:[],dishes:Array.isArray(sh.favorites?.dishes)?sh.favorites.dishes:[]},
+            overrides:{products:sh.overrides?.products&&typeof sh.overrides.products==='object'?sh.overrides.products:{},dishes:sh.overrides?.dishes&&typeof sh.overrides.dishes==='object'?sh.overrides.dishes:{}},
+            pendingShare:sh.pendingShare&&Array.isArray(sh.pendingShare.items)?sh.pendingShare:null,
             workerUrl:pr.workerUrl||'',catalogMode:pr.catalogMode||'saved',onlineSource:pr.onlineSource||'fatsecret'
           };
         },
@@ -47,7 +50,7 @@ export async function initFirebaseClient(config){
           await Promise.all([
             firestoreMod.setDoc(ref('profile_female'),{profile:state.profiles?.female||null,logs:state.logs?.female||{},weights:state.weights?.female||[],updatedAt:firestoreMod.serverTimestamp()}),
             firestoreMod.setDoc(ref('profile_male'),{profile:state.profiles?.male||null,logs:state.logs?.male||{},weights:state.weights?.male||[],updatedAt:firestoreMod.serverTimestamp()}),
-            firestoreMod.setDoc(ref('shared'),{customProducts:state.customProducts||[],recipes:state.recipes||[],plans:state.plans||[],updatedAt:firestoreMod.serverTimestamp()}),
+            firestoreMod.setDoc(ref('shared'),{customProducts:state.customProducts||[],recipes:state.recipes||[],plans:state.plans||[],vessels:state.vessels||[],favorites:state.favorites||{products:[],dishes:[]},overrides:state.overrides||{products:{},dishes:{}},pendingShare:state.pendingShare||null,updatedAt:firestoreMod.serverTimestamp()}),
             firestoreMod.setDoc(ref('preferences'),{activeProfile:state.activeProfile||'female',workerUrl:state.workerUrl||'',catalogMode:state.catalogMode||'saved',onlineSource:state.onlineSource||'fatsecret',updatedAt:firestoreMod.serverTimestamp()})
           ]);
         }

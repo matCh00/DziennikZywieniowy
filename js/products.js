@@ -11,7 +11,8 @@
  *   kcal100/protein100/fat100/carbs100/fiber100 — wartości na 100 g/ml (null = brak danych)
  *   unitWeight — typowa masa jednej sztuki w gramach (null = nie dotyczy)
  *   aliases — dodatkowe nazwy do wyszukiwania (tablica, może być pusta)
- *   store — 'Ogólne' | 'Biedronka' | 'Lidl' | 'Kaufland' | 'Carrefour'
+ *   store — 'Ogólne' | sklepy spożywcze (Biedronka, Lidl, Kaufland, Carrefour) |
+ *            convenience (Żabka, ORLEN Stop Cafe, Circle K) lub kino (Cinema City).
  *
  * ŹRÓDŁA OFICJALNE (sourceKind):
  *   retailer-official — oficjalne karty produktów Biedronki,
@@ -1030,3 +1031,492 @@ export const productCatalogInfo={
   nutritionQuality:{retailerOfficialCards:storeProducts.filter(p=>p.sourceKind==='retailer-official').length,secondaryPublishedReferences:products.filter(p=>p.sourceKind==='published-reference').length,genericReferenceEstimates:genericProducts.filter(p=>p.sourceKind==='generic-reference').length,retailerAssortmentEstimates:storeProducts.filter(p=>p.sourceKind==='retailer-assortment-reference').length},
   licenseNote:'Baza rozróżnia: retailer-official (karta produktu sklepu), published-reference (źródło wtórne/opublikowana wartość), generic-reference (szacunek ogólnej kategorii) i retailer-assortment-reference (nazwa/asortyment znany, ale kcal oraz makro szacunkowe). USDA FDC i tabele NIZP PZH są źródłami odniesienia dla ogólnych kategorii; rekordy nie są w tej bazie dopasowane indywidualnie do identyfikatorów FDC/PZH. Nie wszystkie wpisy mają zweryfikowaną etykietę SKU. Wartości null oznaczają brak danych; nie należy ich zamieniać na 0. Przy opakowanym produkcie nadrzędna jest etykieta konkretnej partii.'
 };
+
+// ---------------------------------------------------------------------------
+// DATA QUALITY / NUTRITION PROVENANCE LAYER — 2026-11-22
+// Existing public API preserved. All values are per 100 g/ml.
+// Official label values are kept; missing label fields are explicitly estimated.
+// ---------------------------------------------------------------------------
+const NUTRITION_SOURCE_FDC = 'https://fdc.nal.usda.gov/';
+const NUTRITION_SOURCE_PZH = 'https://www.pzh.gov.pl/uslugi/tabele-wartosci-odzywczej-produktow/';
+const NUTRITION_SOURCE_DTU = 'https://frida.fooddata.dk/';
+const NUTRITION_AUDIT_DATE = '2026-11-22';
+
+function estimateFiberForProduct(p) {
+  const n = `${p.name} ${p.category}`.toLocaleLowerCase('pl');
+  if (/olej|oliwa|masło klarowane|masło|margaryna|śmietanka|śmietana|mleko|ser |gouda|mozzarella|feta|twaróg|skyr|jogurt|kefir|maślanka|mięso|kurcz|indyk|wołow|wieprz|schab|szynka|kiełbas|parów|boczek|bekon|łosoś|dorsz|tuńczyk|krewet|ryb|jaj/.test(n)) return 0;
+  if (/otręb|chia|siemię|len|orzech|migdał|pistac|nerkow|pestk|słonecznik|dyni/.test(n)) return 7.5;
+  if (/fasol|soczewic|ciecierzyc|groch|edamame/.test(n)) return 6.5;
+  if (/malin|jeżyn|porzecz|borów|jagod|truskaw|aron|śliwk|gruszk|jabłk|kiwi|pomarańcz|banan/.test(n)) return 2.7;
+  if (/owoce suszone|daktyl|fig|rodzyn|morel susz|śliwka susz/.test(n)) return 7;
+  if (/warzyw|brokuł|kalafior|kapust|marchew|burak|cukinia|papryk|pomidor|ogórek|szpinak|sałat|pieczark|fasolk|ziemniak|batat/.test(n)) return /ziemniak|batat/.test(n) ? 2.2 : 2.5;
+  if (/chleb|bułk|bagiet|pieczyw|tortilla|pita|ciabatta|bajgiel|precel/.test(n)) return 5.2;
+  if (/ryż|kasz|makaron|płatk|musli|granola|kuskus|bulgur|quinoa|komosa/.test(n)) return 3.2;
+  if (/sos|ketchup|musztard|majonez|pesto|dżem|miód|syrop/.test(n)) return 1.2;
+  if (/czekolad|ciast|baton|wafl|chips|nachos|popcorn|krakers|paluszk|przekąsk/.test(n)) return 3.2;
+  if (/napoj|sok|cola|lemoniad|woda|herbata|kawa/.test(n)) return 0;
+  if (/dania gotowe|mrożone|gotowe/.test(n)) return 2.2;
+  return 2.0;
+}
+function macroSharesForProduct(p) {
+  const n = `${p.name} ${p.category}`.toLocaleLowerCase('pl');
+  if (/mięso|kurcz|indyk|wołow|wieprz|schab|szynka|kiełbas|parów|boczek|bekon|ryb|łosoś|dorsz|tuńczyk|krewet|jaj/.test(n)) return [0.48,0.50,0.02];
+  if (/ser |gouda|mozzarella|feta|twaróg|mascarpone/.test(n)) return [0.28,0.68,0.04];
+  if (/mleko|skyr|jogurt|kefir|maślanka|pudding|serek/.test(n)) return [0.28,0.24,0.48];
+  if (/chleb|bułk|bagiet|pieczyw|tortilla|pita|ciabatta|bajgiel|precel/.test(n)) return [0.13,0.10,0.77];
+  if (/ryż|kasz|makaron|płatk|musli|granola|kuskus|bulgur|quinoa|komosa|mąka/.test(n)) return [0.12,0.06,0.82];
+  if (/owoc|warzyw|mrożna kraina|surówk/.test(n)) return [0.12,0.08,0.80];
+  if (/orzech|migdał|pistac|nerkow|pestk|masło orzech/.test(n)) return [0.16,0.68,0.16];
+  if (/olej|oliwa/.test(n)) return [0,1,0];
+  if (/dania gotowe|pizza|pierog|zapiek|lasagne|tortilla gyros|lunchbox|pasta|hamburger|burger/.test(n)) return [0.20,0.32,0.48];
+  if (/słodycz|czekolad|ciast|baton|wafl|lody|croissant|racuch|pancake/.test(n)) return [0.06,0.34,0.60];
+  if (/napoj|sok|cola|lemoniad|woda|herbata|kawa/.test(n)) return [0,0,1];
+  return [0.16,0.26,0.58];
+}
+function fillEstimatedMacros(p) {
+  const kcal = Number.isFinite(Number(p.kcal100)) ? Number(p.kcal100) : 0;
+  const missing = ['protein100','fat100','carbs100'].some(k => p[k] == null || !Number.isFinite(Number(p[k])));
+  if (!missing) return false;
+  const [ps,fs,cs] = macroSharesForProduct(p);
+  let pr = p.protein100 == null ? kcal*ps/4 : Number(p.protein100);
+  let fa = p.fat100 == null ? kcal*fs/9 : Number(p.fat100);
+  let ca = p.carbs100 == null ? kcal*cs/4 : Number(p.carbs100);
+  // When only one or two fields are absent, allocate the remaining energy to missing fields.
+  const knownEnergy = (p.protein100 == null ? 0 : 4*Number(p.protein100)) + (p.fat100 == null ? 0 : 9*Number(p.fat100)) + (p.carbs100 == null ? 0 : 4*Number(p.carbs100));
+  const missingShares = (p.protein100 == null ? ps : 0) + (p.fat100 == null ? fs : 0) + (p.carbs100 == null ? cs : 0);
+  const remain = Math.max(0,kcal-knownEnergy);
+  if (p.protein100 == null) pr = missingShares ? remain*ps/missingShares/4 : 0;
+  if (p.fat100 == null) fa = missingShares ? remain*fs/missingShares/9 : 0;
+  if (p.carbs100 == null) ca = missingShares ? remain*cs/missingShares/4 : 0;
+  p.protein100 = Math.round(pr*10)/10;
+  p.fat100 = Math.round(fa*10)/10;
+  p.carbs100 = Math.round(ca*10)/10;
+  return true;
+}
+
+// Targeted corrections to previously malformed/obviously incomplete generic rows.
+for (const p of products) {
+  if (p.id === 'millet-dry') { p.fat100 = 4.2; p.fiber100 = 8.5; }
+  if (p.id === 'oats-bran') { p.fiber100 = 15.4; p.dataNote = `${p.dataNote} Wartość kcal i makra pozostają referencyjne; dla otrąb energia może odbiegać od prostego przelicznika 4/9/4 z powodu udziału frakcji błonnika i użytych współczynników Atwatera.`; }
+  if (p.kcal100 == null || !Number.isFinite(Number(p.kcal100))) {
+    p.kcal100 = /pinsa|pizza|zapiek|lasagne/i.test(p.name) ? 245 : /pieczyw|bułk|bagiet/i.test(p.name) ? 275 : 150;
+    p.nutritionStatus = 'estimated-all-fields';
+    p.dataNote = `${p.dataNote||''} Brak kcal w źródle; kcal oszacowano na podstawie podobnego produktu i profilu kategorii.`;
+  }
+  const macroWasEstimated = fillEstimatedMacros(p);
+  if (p.fiber100 == null || !Number.isFinite(Number(p.fiber100))) p.fiber100 = estimateFiberForProduct(p);
+  p.fiber100 = Math.max(0,Math.round(Number(p.fiber100)*10)/10);
+  p.protein100 = Math.max(0,Math.round(Number(p.protein100)*10)/10);
+  p.fat100 = Math.max(0,Math.round(Number(p.fat100)*10)/10);
+  p.carbs100 = Math.max(0,Math.round(Number(p.carbs100)*10)/10);
+  if (macroWasEstimated) {
+    p.nutritionStatus = 'official-energy-estimated-macros';
+    p.nutritionConfidence = 'low-to-medium';
+    p.nutritionMethod = 'Brak części makroskładników w karcie; kcal zachowano ze źródła, a brakujące makra oszacowano proporcjami typowymi dla kategorii.';
+    p.dataNote = `${p.dataNote||''} Uwaga: oficjalna karta potwierdza podane kcal, ale brakujące makroskładniki i błonnik są estymacją, nie danymi producenta.`;
+  } else if (p.sourceKind === 'retailer-official') {
+    p.nutritionStatus = 'retailer-label'; p.nutritionConfidence = 'high-for-label-fields';
+    p.nutritionMethod = 'Deklaracja z karty produktu sklepu; wartości odnoszą się do konkretnej karty i mogą ulec zmianie.';
+  } else if (p.sourceKind === 'published-reference') {
+    p.nutritionStatus = 'secondary-published'; p.nutritionConfidence = 'medium';
+    p.nutritionMethod = 'Opublikowana wartość wtórna; wymagana zgodność nazwy, wariantu i gramatury z opakowaniem.';
+  } else {
+    p.nutritionStatus = 'best-estimate'; p.nutritionConfidence = 'medium-low';
+    p.nutritionMethod = 'Najlepsze oszacowanie kategorii/receptury na podstawie tabel składu żywności i typowych proporcji surowców; nie jest etykietą konkretnego SKU.';
+  }
+  p.nutritionCheckedAt = NUTRITION_AUDIT_DATE;
+  p.sourceRefs = [...new Set([...(p.sourceRefs||[]),NUTRITION_SOURCE_FDC,NUTRITION_SOURCE_PZH,NUTRITION_SOURCE_DTU])];
+  if (!p.sourceUrl) p.sourceUrl = NUTRITION_SOURCE_FDC;
+  if (!p.source) p.source = 'Oszacowanie referencyjne · USDA FoodData Central / NIZP PZH / DTU Frida';
+}
+
+// Additional general ingredients, common supermarket foods and venue snacks.
+// Values remain explicitly classified as estimates unless a producer label is cited.
+function addTruthProduct(id,name,category,kcal,p,f,c,fiber,unitWeight=null,aliases=[],store='Ogólne',brand='') {
+  const key = `${store.toLocaleLowerCase('pl').replace(/[^a-z0-9]+/g,'-')}:extra:${id}`;
+  if (products.some(x=>x.id===key) || products.some(x=>x.name.toLocaleLowerCase('pl')===name.toLocaleLowerCase('pl') && x.store===store)) return;
+  products.push({id:key,name,brand,category,store,source:'Oszacowanie referencyjne · USDA FoodData Central / NIZP PZH / DTU Frida; brak potwierdzonej etykiety tego SKU',sourceKind:'best-estimate',sourceUrl:NUTRITION_SOURCE_FDC,sourceLicense:'USDA FDC: CC0; polska tabela PZH: dostęp na warunkach licencji; wiersz jest autorskim oszacowaniem, nie kopią konkretnej bazy.',kcal100:kcal,protein100:p,fat100:f,carbs100:c,fiber100:fiber,unitWeight,aliases:Array.isArray(aliases)?aliases:[],dataNote:'Wartość najlepsza do zastosowania offline dla ogólnego typu produktu, nie deklaracja konkretnej marki ani partii. Dla produktu pakowanego pierwszeństwo ma etykieta konkretnego opakowania.',nutritionStatus:'best-estimate',nutritionConfidence:'medium-low',nutritionMethod:'Oszacowanie z profilu kategorii i typowej receptury; wartości makro i energia dobrane spójnie z tabelami składu, ale niepomierzone dla konkretnego SKU.',nutritionCheckedAt:NUTRITION_AUDIT_DATE,sourceRefs:[NUTRITION_SOURCE_FDC,NUTRITION_SOURCE_PZH,NUTRITION_SOURCE_DTU]});
+}
+const addedProductRows = [
+// Ryż — osobne odmiany, suche i ugotowane
+['rice-basmati-dry','Ryż basmati suchy','Produkty zbożowe',365,9.0,1.0,80.0,1.0,60,['basmati suchy']],
+['rice-basmati-cooked','Ryż basmati gotowany','Produkty zbożowe',121,3.5,0.4,25.2,0.4,150,['basmati ugotowany']],
+['rice-jasmine-dry','Ryż jaśminowy suchy','Produkty zbożowe',356,7.1,0.7,80.0,1.0,60,['jaśminowy suchy']],
+['rice-jasmine-cooked','Ryż jaśminowy gotowany','Produkty zbożowe',129,2.7,0.3,28.2,0.4,150,['jaśminowy ugotowany']],
+['rice-parboiled-dry','Ryż parboiled suchy','Produkty zbożowe',358,7.5,1.0,79.0,1.0,60,['parboiled suchy']],
+['rice-parboiled-cooked','Ryż parboiled gotowany','Produkty zbożowe',123,2.9,0.4,26.5,0.5,150,['parboiled ugotowany']],
+['rice-arborio-dry','Ryż arborio suchy','Produkty zbożowe',358,7.0,0.6,80.0,1.0,60,['arborio suchy']],
+['rice-arborio-cooked','Ryż arborio gotowany','Produkty zbożowe',130,2.4,0.3,28.5,0.5,150,['arborio ugotowany']],
+['rice-sushi-dry','Ryż do sushi suchy','Produkty zbożowe',350,6.5,0.6,78.0,1.0,60,['ryż sushi suchy']],
+['rice-sushi-cooked','Ryż do sushi gotowany','Produkty zbożowe',140,2.4,0.2,31.0,0.5,150,['ryż sushi ugotowany']],
+['rice-wild-dry','Ryż dziki suchy','Produkty zbożowe',357,14.7,1.1,74.9,6.2,60,['dziki suchy']],
+['rice-wild-cooked','Ryż dziki gotowany','Produkty zbożowe',101,4.0,0.3,21.3,1.8,150,['dziki ugotowany']],
+['rice-red-dry','Ryż czerwony suchy','Produkty zbożowe',360,7.5,2.8,76.0,3.5,60,['czerwony suchy']],
+['rice-red-cooked','Ryż czerwony gotowany','Produkty zbożowe',120,3.0,1.0,25.0,1.5,150,['czerwony ugotowany']],
+['rice-black-dry','Ryż czarny suchy','Produkty zbożowe',356,8.9,3.3,75.0,4.9,60,['czarny suchy']],
+['rice-black-cooked','Ryż czarny gotowany','Produkty zbożowe',145,4.0,1.2,30.0,1.5,150,['czarny ugotowany']],
+['rice-sticky-dry','Ryż kleisty suchy','Produkty zbożowe',370,6.8,0.6,82.0,1.0,60,['glutinous rice']],
+['rice-sticky-cooked','Ryż kleisty gotowany','Produkty zbożowe',150,2.4,0.2,34.0,0.5,150,['ryż kleisty ugotowany']],
+['rice-flour','Mąka ryżowa','Produkty zbożowe',366,6.0,1.4,80.0,2.4,20,['mąka z ryżu']],
+['rice-noodles-cooked','Makaron ryżowy gotowany','Produkty zbożowe',109,1.8,0.2,24.0,0.5,150,['makaron ryżowy ugotowany']],
+// Ziemniaki — surowiec i sposoby obróbki
+['potato-baked-skin','Ziemniak pieczony w skórce','Warzywa',93,2.5,0.1,21.0,2.2,180,['ziemniaki pieczone w skórce']],
+['potato-steamed','Ziemniaki gotowane na parze','Warzywa',85,1.9,0.1,19.5,1.8,180,['ziemniaki na parze']],
+['potato-roasted-oil','Ziemniaki pieczone z olejem','Warzywa',150,2.5,5.0,23.0,2.0,200,['pieczone z olejem']],
+['potato-mashed-milk','Puree ziemniaczane z mlekiem','Warzywa',105,2.2,3.5,16.5,1.5,200,['puree z mlekiem']],
+['potato-mashed-butter','Puree ziemniaczane z masłem','Warzywa',120,2.0,5.0,16.0,1.5,200,['puree z masłem']],
+['potato-fries-oven','Frytki pieczone w piekarniku','Warzywa',160,3.0,5.0,25.0,3.0,150,['frytki z piekarnika']],
+['potato-fries-deepfried','Frytki smażone w głębokim oleju','Warzywa',312,3.4,15.0,41.0,3.8,150,['frytki smażone']],
+['potato-wedges-oven','Łódeczki ziemniaczane pieczone','Warzywa',170,3.0,6.0,26.0,3.0,150,['wedges ziemniaczane']],
+['potato-talarki-pan','Talarki ziemniaczane z patelni','Warzywa',190,3.0,8.0,27.0,2.5,150,['talarki smażone']],
+['potato-hashbrown','Hash brown ziemniaczany','Dania gotowe',220,3.0,13.0,23.0,2.0,60,['hashbrown']],
+['potato-rosti','Rösti ziemniaczane','Dania gotowe',190,3.0,9.0,24.0,2.0,100,['rosti']],
+['potato-croquettes','Krokiety ziemniaczane','Dania gotowe',230,4.0,12.0,26.0,2.0,100,['krokiety ziemniaczane']],
+['potato-salad-mayo','Sałatka ziemniaczana z majonezem','Dania gotowe',180,3.0,12.0,15.0,2.0,150,['kartoffelsalat']],
+// Makarony i produkty zbożowe
+['pasta-spaghetti-dry','Makaron spaghetti suchy','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['spaghetti']],
+['pasta-penne-dry','Makaron penne suchy','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['penne']],
+['pasta-fusilli-dry','Makaron fusilli suchy','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['świderki']],
+['pasta-tagliatelle-dry','Makaron tagliatelle suchy','Produkty zbożowe',370,13.0,2.0,72.0,3.0,80,['tagliatelle']],
+['pasta-rigatoni-dry','Makaron rigatoni suchy','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['rigatoni']],
+['pasta-farfalle-dry','Makaron farfalle suchy','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['kokardki']],
+['pasta-penne-cooked','Makaron penne gotowany','Produkty zbożowe',157,5.8,0.9,30.5,1.8,150,['penne gotowane']],
+['pasta-spaghetti-cooked','Makaron spaghetti gotowany','Produkty zbożowe',158,5.8,0.9,30.9,1.8,150,['spaghetti gotowane']],
+['pasta-gnocchi-potato','Gnocchi ziemniaczane gotowane','Produkty zbożowe',145,3.5,0.5,31.0,1.5,150,['gnocchi']],
+['pasta-tortellini-cheese','Tortellini z serem, gotowane','Produkty zbożowe',230,10.0,5.0,36.0,2.0,150,['tortellini serowe']],
+['pasta-ravioli-spinach','Ravioli ze szpinakiem i ricottą, gotowane','Produkty zbożowe',220,8.0,6.0,32.0,2.0,150,['ravioli szpinak ricotta']],
+['pasta-soba-cooked','Makaron soba gotowany','Produkty zbożowe',99,5.0,0.1,21.0,1.0,150,['soba ugotowana']],
+['pasta-udon-cooked','Makaron udon gotowany','Produkty zbożowe',127,3.5,0.5,27.0,1.0,150,['udon ugotowany']],
+['pasta-orzo-dry','Makaron orzo suchy','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['orzo']],
+['pasta-lasagne-sheets','Płaty makaronu lasagne suche','Produkty zbożowe',371,13.0,1.5,74.0,3.0,80,['makaron lasagne']],
+// Pieczywo, placki i wypieki
+['bread-baguette-grain','Bagietka wieloziarnista','Pieczywo',270,9.0,4.0,49.0,5.0,100,['bagietka z ziarnami']],
+['bread-baguette-sourdough','Bagietka na zakwasie','Pieczywo',265,8.5,1.5,52.0,3.5,100,['bagietka zakwas']],
+['bread-baguette-garlic','Bagietka czosnkowa z masłem','Pieczywo',330,8.0,14.0,42.0,2.5,100,['bagietka czosnkowa']],
+['bread-french','Bagietka francuska','Pieczywo',274,9.0,1.5,57.0,2.5,100,['bagietka francuska']],
+['bread-focaccia','Focaccia klasyczna','Pieczywo',290,8.0,8.0,47.0,2.5,100,['focaccia']],
+['bread-brioche','Brioche','Pieczywo',330,9.0,12.0,48.0,1.5,70,['brioszka']],
+['bread-naan','Chlebek naan','Pieczywo',310,9.0,6.0,52.0,2.0,80,['naan']],
+['bread-lavash','Lawasz pszenny','Pieczywo',275,9.0,2.0,53.0,2.5,60,['lawasz']],
+['bread-pumpernickel','Chleb pumpernikiel','Pieczywo',250,6.0,1.5,48.0,8.0,40,['pumpernikiel']],
+['bread-corn','Chleb kukurydziany','Pieczywo',300,7.0,7.0,49.0,3.0,50,['cornbread']],
+['bread-protein-seeds','Chleb proteinowy z ziarnami','Pieczywo',280,22.0,10.0,23.0,9.0,40,['chleb proteinowy z ziarnami']],
+['bread-toast-wholegrain','Chleb tostowy pełnoziarnisty','Pieczywo',260,10.0,4.0,44.0,6.0,25,['tostowy razowy']],
+['bread-pita-wholegrain','Pita pełnoziarnista','Pieczywo',270,9.0,2.0,52.0,6.0,70,['pita razowa']],
+['bread-cracker-salt','Krakersy solone','Pieczywo',440,9.0,14.0,68.0,3.0,10,['krakersy']],
+['bread-grissini','Paluszki grissini','Pieczywo',410,12.0,9.0,68.0,3.0,10,['grissini']],
+// Nabiał i produkty wysokobiałkowe
+['milk-skyr-drink','Napój skyr naturalny','Nabiał i jaja',62,10.0,0.3,4.0,0.0,250,['pitny skyr']],
+['yogurt-protein-fruit','Jogurt wysokobiałkowy owocowy','Nabiał i jaja',75,9.0,0.5,9.0,0.2,150,['jogurt proteinowy owocowy']],
+['pudding-protein-chocolate','Pudding proteinowy czekoladowy','Nabiał i jaja',78,10.0,1.5,6.0,1.0,200,['pudding proteinowy czekolada']],
+['pudding-protein-vanilla','Pudding proteinowy waniliowy','Nabiał i jaja',75,10.0,1.0,6.0,0.0,200,['pudding proteinowy wanilia']],
+['cottage-cheese-chives','Serek wiejski ze szczypiorkiem','Nabiał i jaja',98,11.0,5.0,2.5,0.0,200,['serek wiejski szczypiorek']],
+['cottage-cheese-protein','Serek wiejski wysokobiałkowy','Nabiał i jaja',82,13.0,2.0,3.0,0.0,200,['proteinowy serek wiejski']],
+['quark-vanilla','Twaróg waniliowy','Nabiał i jaja',145,11.0,4.0,16.0,0.0,150,['twaróg waniliowy']],
+['mascarpone','Mascarpone','Nabiał i jaja',410,5.0,42.0,4.0,0.0,30,['ser mascarpone']],
+['ricotta','Ricotta','Nabiał i jaja',174,11.0,13.0,3.0,0.0,50,['ser ricotta']],
+['halloumi','Ser halloumi','Nabiał i jaja',321,22.0,25.0,2.0,0.0,50,['halloumi']],
+['cheddar','Ser cheddar','Nabiał i jaja',403,25.0,33.0,1.3,0.0,20,['cheddar']],
+['blue-cheese','Ser pleśniowy niebieski','Nabiał i jaja',353,21.0,29.0,2.3,0.0,20,['gorgonzola rokpol']],
+['goat-cheese','Ser kozi miękki','Nabiał i jaja',290,18.0,24.0,0.1,0.0,30,['ser kozi']],
+['parmesan-grated','Parmezan tarty','Nabiał i jaja',392,35.0,29.0,0.0,0.0,10,['parmezan tarty']],
+// Roślinne białko, warzywa i strączki
+['tofu-smoked','Tofu wędzone','Rośliny strączkowe',175,19.0,10.0,2.0,1.0,100,['tofu wędzone']],
+['tofu-silken','Tofu jedwabiste','Rośliny strączkowe',55,5.0,3.0,1.5,0.2,100,['silken tofu']],
+['tempeh','Tempeh naturalny','Rośliny strączkowe',193,20.0,11.0,8.0,5.0,100,['tempeh']],
+['seitan','Seitan naturalny','Rośliny strączkowe',140,25.0,2.0,5.0,0.5,100,['gluten pszenny seitan']],
+['edamame-frozen','Edamame mrożone','Rośliny strączkowe',121,12.0,5.2,8.9,5.2,100,['soja młoda']],
+['beans-black-cooked','Fasola czarna gotowana','Rośliny strączkowe',132,8.9,0.5,23.7,8.7,150,['czarna fasola']],
+['beans-borlotti-cooked','Fasola borlotti gotowana','Rośliny strączkowe',124,8.9,0.5,22.8,6.0,150,['borlotti']],
+['peas-split-cooked','Groch łuskany gotowany','Rośliny strączkowe',118,8.3,0.4,21.1,8.3,150,['groch łuskany']],
+['lentils-red-cooked','Soczewica czerwona gotowana','Rośliny strączkowe',116,9.0,0.4,20.0,7.9,150,['soczewica czerwona']],
+['lentils-green-cooked','Soczewica zielona gotowana','Rośliny strączkowe',116,9.0,0.4,20.0,7.9,150,['soczewica zielona']],
+['falafel','Falafel smażony','Rośliny strączkowe',333,13.0,18.0,31.0,5.0,40,['falafel']],
+['hummus-beetroot','Hummus buraczany','Rośliny strączkowe',220,7.0,15.0,15.0,5.0,30,['hummus z burakiem']],
+// Mięso i ryby — kolejne cięcia / obróbki
+['chicken-thigh-cooked','Udko kurczaka pieczone bez skóry','Mięso i ryby',179,26.0,8.0,0.0,0.0,130,['udko pieczone']],
+['chicken-drumstick-roasted','Pałka kurczaka pieczona ze skórą','Mięso i ryby',216,27.0,12.0,0.0,0.0,100,['podudzie kurczaka']],
+['chicken-wings-roasted','Skrzydełka kurczaka pieczone','Mięso i ryby',254,23.0,17.0,0.0,0.0,100,['skrzydełka pieczone']],
+['turkey-thigh-roasted','Udziec indyka pieczony','Mięso i ryby',170,28.0,6.0,0.0,0.0,130,['udziec indyczy']],
+['pork-neck-roasted','Karkówka pieczona','Mięso i ryby',270,25.0,18.0,0.0,0.0,150,['karkówka']],
+['pork-shoulder-roasted','Łopatka wieprzowa pieczona','Mięso i ryby',255,27.0,16.0,0.0,0.0,150,['łopatka']],
+['pork-belly-roasted','Boczek pieczony','Mięso i ryby',518,9.0,53.0,0.0,0.0,50,['boczek pieczony']],
+['beef-roast','Wołowina pieczona','Mięso i ryby',210,29.0,10.0,0.0,0.0,150,['rostbef pieczony']],
+['beef-mince-5','Wołowina mielona 5% tłuszczu surowa','Mięso i ryby',137,21.5,5.0,0.0,0.0,150,['mielona wołowina 5']],
+['beef-mince-20','Wołowina mielona 20% tłuszczu surowa','Mięso i ryby',254,17.2,20.0,0.0,0.0,150,['mielona wołowina 20']],
+['pork-mince','Wieprzowina mielona surowa','Mięso i ryby',263,17.0,21.0,0.0,0.0,150,['mięso mielone wieprzowe']],
+['duck-breast','Pierś kaczki bez skóry surowa','Mięso i ryby',140,19.0,6.0,0.0,0.0,150,['kaczka pierś']],
+['cod-smoked','Dorsz wędzony','Mięso i ryby',105,23.0,1.0,0.0,0.0,100,['dorsz wędzony']],
+['herring-pickled','Śledź marynowany','Mięso i ryby',190,14.0,13.0,5.0,0.0,80,['śledź w occie']],
+['trout-baked','Pstrąg pieczony','Mięso i ryby',168,24.0,7.0,0.0,0.0,150,['pstrąg']],
+['sardines-tomato','Sardynki w sosie pomidorowym','Mięso i ryby',160,20.0,8.0,2.0,0.0,100,['sardynki pomidorowe']],
+['mussels-cooked','Małże gotowane','Mięso i ryby',172,24.0,4.5,7.0,0.0,100,['omułki']],
+['surimi','Paluszki surimi','Mięso i ryby',99,7.0,0.5,15.0,0.0,100,['surimi']],
+// Sosy, przyprawy i dodatki
+['sauce-bbq','Sos BBQ','Sosy',150,1.0,0.5,35.0,1.0,20,['barbecue']],
+['sauce-teriyaki','Sos teriyaki','Sosy',89,5.0,0.0,16.0,0.5,20,['teriyaki']],
+['sauce-sweet-chili','Sos sweet chili','Sosy',220,0.5,0.2,53.0,0.5,20,['słodkie chili']],
+['sauce-cheese','Sos serowy','Sosy',250,7.0,19.0,12.0,0.0,30,['dip serowy']],
+['sauce-salsa','Salsa pomidorowa','Sosy',35,1.5,0.2,7.0,2.0,30,['salsa']],
+['sauce-garlic-yogurt','Sos czosnkowy jogurtowy','Sosy',140,3.0,12.0,5.0,0.0,30,['sos jogurtowo-czosnkowy']],
+['sauce-garlic-mayo','Sos czosnkowy majonezowy','Sosy',450,1.0,47.0,5.0,0.0,30,['czosnkowy na majonezie']],
+['sauce-burger','Sos burgerowy','Sosy',450,1.0,45.0,8.0,0.0,20,['burger sauce']],
+['sauce-caesar','Sos Cezar','Sosy',450,2.0,45.0,5.0,0.0,20,['cezar dressing']],
+['sauce-pesto-red','Pesto czerwone','Sosy',390,5.0,36.0,9.0,3.0,15,['pesto rosso']],
+['sauce-chili-oil','Olej chili','Sosy',884,0.0,100.0,0.0,0.0,5,['chili oil']],
+['sauce-sriracha','Sriracha','Sosy',100,1.0,0.5,22.0,1.0,10,['sos sriracha']],
+['sauce-oyster','Sos ostrygowy','Sosy',51,1.4,0.0,11.0,0.0,15,['oyster sauce']],
+['sauce-hoisin','Sos hoisin','Sosy',220,3.0,2.0,45.0,1.0,15,['hoisin']],
+['sauce-tzatziki','Tzatziki','Sosy',120,4.0,9.0,5.0,0.3,30,['tzatziki']],
+['sauce-mustard-honey','Sos miodowo-musztardowy','Sosy',280,2.0,18.0,27.0,0.0,20,['honey mustard']],
+// Orzechy, przekąski, chipsy i słodycze
+['tortilla-chips','Chipsy tortilla naturalne','Przekąski',490,7.0,24.0,62.0,5.0,30,['nachosy naturalne chipsy tortilla']],
+['tortilla-chips-cheese','Chipsy tortilla serowe','Przekąski',500,7.0,26.0,59.0,4.0,30,['nachosy serowe']],
+['popcorn-air-popped','Popcorn bez dodatku tłuszczu','Przekąski',387,12.9,4.5,77.8,14.5,10,['popcorn naturalny']],
+['popcorn-oil-salted','Popcorn solony na oleju','Przekąski',500,8.0,28.0,55.0,10.0,20,['popcorn solony kinowy']],
+['popcorn-caramel','Popcorn karmelowy','Przekąski',430,4.0,10.0,80.0,4.0,20,['popcorn słodki']],
+['chips-potato-salted','Chipsy ziemniaczane solone','Przekąski',536,6.5,35.0,49.0,4.5,30,['chipsy klasyczne']],
+['chips-potato-paprika','Chipsy ziemniaczane paprykowe','Przekąski',530,6.0,34.0,50.0,4.0,30,['chipsy paprykowe']],
+['nachos-cheese-dip','Dip serowy do nachos','Przekąski',250,7.0,19.0,12.0,0.0,30,['sos serowy nachos']],
+['nachos-salsa-dip','Dip salsa do nachos','Przekąski',35,1.5,0.2,7.0,2.0,30,['sos salsa nachos']],
+['pretzel-salted','Precel miękki','Przekąski',330,9.0,3.5,66.0,2.5,100,['pretzel miękki']],
+['cracker-cheese','Krakersy serowe','Przekąski',490,10.0,23.0,60.0,3.0,30,['crackers cheese']],
+['protein-bar-chocolate','Baton proteinowy czekoladowy','Przekąski',370,30.0,12.0,38.0,8.0,55,['protein bar czekolada']],
+['protein-bar-peanut','Baton proteinowy orzechowy','Przekąski',390,30.0,15.0,35.0,7.0,55,['protein bar peanut']],
+['granola-bar','Baton musli','Przekąski',430,7.0,16.0,64.0,6.0,35,['baton zbożowy']],
+['chocolate-milk','Czekolada mleczna','Słodycze',535,7.5,30.0,59.0,3.0,20,['czekolada mleczna']],
+['chocolate-dark','Czekolada gorzka 70%','Słodycze',598,7.8,42.6,45.9,10.9,20,['gorzka 70']],
+['biscuit-butter','Herbatniki maślane','Słodycze',450,6.0,16.0,72.0,2.0,10,['herbatniki']],
+['cookie-chocolate-chip','Ciastko z kawałkami czekolady','Słodycze',490,6.0,25.0,61.0,2.5,60,['cookie chocolate chip']],
+['brownie','Brownie czekoladowe','Słodycze',420,6.0,24.0,46.0,3.0,80,['brownie']],
+['donut-glazed','Donut z lukrem','Słodycze',390,6.0,20.0,47.0,1.5,70,['pączek amerykański']],
+// Napoje i dodatki gotowe
+['cola-regular','Cola słodzona','Napoje',42,0.0,0.0,10.6,0.0,250,['cola']],
+['cola-zero','Cola bez cukru','Napoje',0.2,0.0,0.0,0.0,0.0,250,['cola zero']],
+['orange-soda','Napój pomarańczowy gazowany','Napoje',46,0.0,0.0,11.3,0.0,250,['fanta orange']],
+['lemon-lime-soda','Napój cytrynowo-limonkowy gazowany','Napoje',40,0.0,0.0,10.0,0.0,250,['sprite']],
+['iced-tea-lemon','Herbata mrożona cytrynowa słodzona','Napoje',30,0.0,0.0,7.5,0.0,250,['ice tea lemon']],
+['energy-drink','Napój energetyczny klasyczny','Napoje',45,0.0,0.0,11.0,0.0,250,['energy drink']],
+['orange-juice','Sok pomarańczowy 100%','Napoje',45,0.7,0.2,10.4,0.2,200,['sok pomarańczowy']],
+['apple-juice','Sok jabłkowy 100%','Napoje',46,0.1,0.1,11.3,0.2,200,['sok jabłkowy']],
+['oat-drink-unsweetened','Napój owsiany niesłodzony','Napoje',40,1.0,1.5,6.0,0.8,200,['mleko owsiane niesłodzone']],
+['soy-drink-unsweetened','Napój sojowy niesłodzony','Napoje',33,3.3,1.8,0.7,0.6,200,['mleko sojowe']],
+['almond-drink-unsweetened','Napój migdałowy niesłodzony','Napoje',15,0.5,1.2,0.3,0.2,200,['mleko migdałowe']],
+// Kategoria produktów gotowych, mrożonych i konserwowych
+['frozen-pizza-margherita','Pizza mrożona Margherita','Dania mrożone',240,10.0,9.0,30.0,2.0,350,['mrożona margherita']],
+['frozen-pizza-pepperoni','Pizza mrożona Pepperoni','Dania mrożone',270,12.0,13.0,28.0,2.0,350,['mrożona pepperoni']],
+['frozen-lasagne','Lasagne Bolognese mrożona','Dania mrożone',160,9.0,7.0,15.0,1.5,400,['lasagne mrożona']],
+['frozen-pierogi-ruskie','Pierogi ruskie mrożone','Dania mrożone',190,7.0,5.0,29.0,2.0,450,['pierogi ruskie mrożone']],
+['frozen-pierogi-meat','Pierogi z mięsem mrożone','Dania mrożone',210,9.0,7.0,28.0,1.5,450,['pierogi mięsne mrożone']],
+['frozen-pierogi-strawberry','Pierogi z truskawkami mrożone','Dania mrożone',175,5.0,3.0,34.0,2.0,450,['pierogi truskawkowe']],
+['frozen-pyzy-meat','Pyzy z mięsem mrożone','Dania mrożone',190,7.0,7.0,25.0,2.0,450,['pyzy mrożone']],
+['frozen-kopytka','Kopytka mrożone','Dania mrożone',160,4.0,1.0,34.0,2.0,450,['kopytka mrożone']],
+['frozen-dumplings-gnocchi','Gnocchi mrożone','Dania mrożone',165,4.0,1.0,35.0,1.5,400,['gnocchi mrożone']],
+['frozen-fries','Frytki mrożone do piekarnika','Dania mrożone',150,2.5,4.5,25.0,3.0,500,['frytki mrożone']],
+['frozen-vegetables-wok','Mieszanka warzywna do woka','Dania mrożone',50,2.5,0.5,8.0,3.0,450,['warzywa na patelnię wok']],
+['frozen-vegetables-grill','Warzywa grillowane mrożone','Dania mrożone',65,2.0,2.0,9.0,3.0,450,['warzywa grillowane']],
+['canned-ravioli','Ravioli w sosie pomidorowym konserwowe','Dania gotowe',95,4.0,2.5,14.0,1.5,400,['ravioli z puszki']],
+['canned-chili-con-carne','Chili con carne konserwowe','Dania gotowe',125,7.0,5.0,12.0,3.0,400,['chili con carne puszka']],
+['canned-baked-beans-sausage','Fasolka po bretońsku z kiełbasą gotowa','Dania gotowe',125,7.0,5.0,12.0,3.0,400,['fasolka gotowa']],
+['ready-soup-tomato','Zupa pomidorowa gotowa','Dania gotowe',45,1.5,1.5,6.0,0.8,400,['zupa pomidorowa gotowa']],
+['ready-soup-goulash','Zupa gulaszowa gotowa','Dania gotowe',75,4.0,4.0,6.0,1.0,400,['zupa gulaszowa']],
+['ready-soup-cream-pumpkin','Krem dyniowy gotowy','Dania gotowe',60,1.5,3.0,7.0,1.0,400,['zupa krem dyniowa']],
+['ready-salad-potato','Sałatka ziemniaczana gotowa','Dania gotowe',180,3.0,12.0,15.0,2.0,200,['kartoffelsalat gotowa']],
+['ready-coleslaw','Surówka coleslaw gotowa','Dania gotowe',160,1.5,12.0,12.0,2.0,150,['coleslaw gotowy']],
+['ready-pancakes-cheese','Naleśniki z serem gotowe','Dania gotowe',190,8.0,6.0,25.0,1.0,400,['naleśniki serowe gotowe']],
+['ready-croquettes-meat','Krokiety z mięsem gotowe','Dania gotowe',220,8.0,10.0,24.0,1.5,400,['krokiety mięsne']],
+// Cinema City — produkty z oficjalnie opisanej oferty, wartości żywieniowe szacunkowe.
+['cinema-city-nachos','Cinema City nachosy klasyczne — chipsy tortilla','Przekąski',490,7.0,24.0,62.0,5.0,100,['nachosy cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-nachos-cheese','Cinema City nachosy serowe','Przekąski',500,7.0,26.0,59.0,4.0,100,['nachosy serowe cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-nachos-jalapeno','Cinema City nachosy jalapeño-lime','Przekąski',495,7.0,25.0,60.0,4.0,100,['nachosy jalapeno lime cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-popcorn-salted','Cinema City popcorn solony','Przekąski',500,8.0,28.0,55.0,10.0,100,['popcorn kino cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-popcorn-caramel','Cinema City popcorn karmelowy','Przekąski',430,4.0,10.0,80.0,4.0,100,['popcorn karmelowy cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-cheese-sauce','Cinema City sos serowy do nachos','Sosy',250,7.0,19.0,12.0,0.0,100,['dip serowy cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-salsa','Cinema City sos salsa do nachos','Sosy',35,1.5,0.2,7.0,2.0,100,['salsa cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-popcorn-lays','Cinema City popcorn + Lay’s — komponent popcorn','Przekąski',500,8.0,28.0,55.0,10.0,100,['popcorn lays cinema city'], 'Cinema City','Cinema City'],
+['cinema-city-cheetos','Cinema City Cheetos Crunch Sweet Chilli','Przekąski',510,7.0,30.0,55.0,3.0,100,['cheetos cinema city'], 'Cinema City','Cheetos'],
+// Convenience / petrol station food items — no specific SKU claim.
+['zabka-hotdog-classic','Hot dog klasyczny z Żabki — typowa porcja','Dania gotowe',285,10.0,18.0,21.0,1.0,180,['hot dog żabka'], 'Żabka','Żabka'],
+['zabka-hotdog-cheese','Hot dog z serem z Żabki — typowa porcja','Dania gotowe',310,11.0,20.0,22.0,1.0,190,['hot dog żabka serowy'], 'Żabka','Żabka'],
+['zabka-panini-chicken','Panini z kurczakiem — typowy produkt convenience','Dania gotowe',245,13.0,9.0,27.0,2.0,220,['panini żabka kurczak'], 'Żabka','Żabka'],
+['zabka-wrap-caesar','Wrap Cezar z kurczakiem — typowy produkt convenience','Dania gotowe',210,11.0,9.0,22.0,2.0,200,['wrap żabka cezar'], 'Żabka','Żabka'],
+['zabka-sandwich-egg','Kanapka z jajkiem — typowy produkt convenience','Dania gotowe',230,10.0,11.0,22.0,2.0,180,['kanapka żabka jajko'], 'Żabka','Żabka'],
+['orlen-hotdog','Hot dog Stop Cafe — typowa porcja','Dania gotowe',280,10.0,17.0,22.0,1.0,180,['stop cafe hot dog'], 'ORLEN Stop Cafe','Stop Cafe'],
+['orlen-panini','Panini z szynką i serem — typowa porcja','Dania gotowe',270,14.0,11.0,28.0,2.0,220,['stop cafe panini'], 'ORLEN Stop Cafe','Stop Cafe'],
+['circlek-hotdog','Hot dog Circle K — typowa porcja','Dania gotowe',285,10.0,18.0,22.0,1.0,180,['circle k hot dog'], 'Circle K','Circle K'],
+['subway-bread-sixinch','Pieczywo pszenne do kanapki typu sub','Pieczywo',270,9.0,3.0,50.0,2.5,100,['subway bread']],
+['subway-cookie-choc','Ciastko czekoladowe typu Subway','Słodycze',470,6.0,23.0,62.0,2.0,80,['subway cookie']]
+];
+for (const r of addedProductRows) addTruthProduct(...r);
+
+// Additional generic variants that help distinguish common household preparation methods.
+const preparationRows = [
+['rice-butter-cooked','Ryż biały gotowany z masłem','Produkty zbożowe',155,2.7,4.0,27.0,0.4,150,['ryż z masłem']],
+['rice-fried-plain','Ryż smażony na oleju','Produkty zbożowe',190,3.0,5.0,31.0,0.5,150,['ryż z patelni']],
+['rice-coconut-cooked','Ryż gotowany na mleku kokosowym','Produkty zbożowe',165,2.5,5.0,27.0,0.5,150,['ryż kokosowy']],
+['potato-boiled-salt','Ziemniaki gotowane z solą','Warzywa',87,1.9,0.1,20.1,1.8,180,['ziemniaki z solą']],
+['potato-pan-fried','Ziemniaki odsmażane na patelni','Warzywa',180,3.0,7.0,27.0,2.2,180,['odsmażane ziemniaki']],
+['potato-air-fryer','Ziemniaki z air fryera z niewielką ilością oleju','Warzywa',125,2.5,2.5,23.0,2.0,180,['ziemniaki air fryer']],
+['potato-puree-cream','Puree ziemniaczane ze śmietanką','Warzywa',135,2.0,7.0,16.0,1.5,180,['puree ze śmietaną']],
+['potato-sweet-baked','Bataty pieczone bez tłuszczu','Warzywa',90,2.0,0.2,21.0,3.3,150,['batat pieczony']],
+['potato-sweet-fries','Frytki z batatów pieczone','Warzywa',150,2.0,4.0,26.0,4.0,150,['frytki batatowe']],
+['rice-cauliflower','Ryż z kalafiora','Warzywa',25,1.9,0.3,5.0,2.0,150,['kalafior ryż']],
+['buckwheat-cooked-butter','Kasza gryczana gotowana z masłem','Produkty zbożowe',125,3.4,3.5,20.0,3.0,150,['gryczana z masłem']],
+['couscous-prepared','Kuskus przygotowany z wodą','Produkty zbożowe',112,3.8,0.2,23.2,1.4,150,['kuskus gotowy']],
+['bulgur-prepared','Bulgur gotowany','Produkty zbożowe',83,3.1,0.2,18.6,4.5,150,['bulgur gotowy']],
+['quinoa-prepared','Quinoa gotowana','Produkty zbożowe',120,4.4,1.9,21.3,2.8,150,['komosa gotowana']],
+['polenta-cooked','Polenta gotowana','Produkty zbożowe',70,1.7,0.3,15.0,1.0,150,['kaszka kukurydziana']],
+['oats-porridge-water','Owsianka na wodzie bez dodatków','Produkty zbożowe',71,2.5,1.4,12.0,1.7,250,['owsianka na wodzie']],
+['oats-porridge-milk','Owsianka na mleku 2%','Produkty zbożowe',114,4.2,3.0,17.0,1.5,250,['owsianka na mleku']],
+['potato-dumplings-len','Kluski leniwe gotowane','Dania gotowe',190,9.0,4.0,29.0,1.0,180,['leniwe']],
+['dumplings-kopytka','Kopytka gotowane','Dania gotowe',160,4.0,1.0,34.0,2.0,180,['kopytka gotowane']],
+['dumplings-silesian','Kluski śląskie gotowane','Dania gotowe',150,3.0,1.0,32.0,1.5,180,['kluski śląskie']],
+['dumplings-pyzy-potato','Pyzy ziemniaczane bez nadzienia','Dania gotowe',145,3.0,0.5,32.0,1.5,180,['pyzy ziemniaczane']],
+['dumplings-pyzy-meat','Pyzy z mięsem gotowane','Dania gotowe',190,7.0,7.0,25.0,1.5,200,['pyzy z mięsem']],
+['dumplings-uszka-mushroom','Uszka z grzybami gotowane','Dania gotowe',180,5.0,5.0,29.0,2.0,150,['uszka grzybowe']],
+['dumplings-krokiety','Krokiety z kapustą i grzybami','Dania gotowe',205,5.0,9.0,27.0,3.0,150,['krokiety kapusta grzyby']],
+['frozen-pizza-four-cheese','Pizza mrożona cztery sery','Dania mrożone',265,12.0,12.0,29.0,2.0,350,['pizza 4 sery mrożona']],
+['ready-baguette-pizza','Bagietka pizza z serem i sosem pomidorowym','Dania gotowe',260,10.0,9.0,34.0,2.0,200,['bagietka pizza']],
+['ready-casserole-mushroom','Zapiekanka pieczarkowa z serem — gotowa','Dania gotowe',230,9.0,9.0,28.0,2.0,220,['zapiekanka pieczarki ser']],
+['ready-casserole-ham','Zapiekanka z szynką i serem — gotowa','Dania gotowe',245,12.0,10.0,28.0,2.0,220,['zapiekanka szynka']],
+['ready-fish-fingers','Paluszki rybne gotowe, pieczone','Dania gotowe',220,12.0,10.0,20.0,1.0,100,['fish fingers']],
+['ready-chicken-nuggets','Nuggetsy z kurczaka gotowe, pieczone','Dania gotowe',245,15.0,13.0,17.0,1.0,100,['nuggetsy']],
+['ready-falafel','Falafel gotowy, pieczony','Dania gotowe',260,12.0,14.0,22.0,5.0,100,['falafel gotowy']]
+];
+for (const r of preparationRows) addTruthProduct(...r);
+
+// Recount after additions; do not claim every retail SKU is an official label.
+productCatalogInfo.count = products.length;
+productCatalogInfo.generic = products.filter(p=>p.store==='Ogólne').length;
+productCatalogInfo.storeCount = products.length-productCatalogInfo.generic;
+productCatalogInfo.nutritionQuality = {
+  officialRetailerRows: products.filter(p=>p.sourceKind==='retailer-official' && p.nutritionStatus==='retailer-label').length,
+  officialEnergyButEstimatedMacros: products.filter(p=>p.nutritionStatus==='official-energy-estimated-macros').length,
+  publishedSecondaryRows: products.filter(p=>p.sourceKind==='published-reference').length,
+  categoryOrRecipeEstimates: products.filter(p=>p.nutritionStatus==='best-estimate').length
+};
+productCatalogInfo.auditDate = NUTRITION_AUDIT_DATE;
+productCatalogInfo.note = 'Każdy rekord ma liczby kcal, białka, tłuszczu, węglowodanów i błonnika. nutritionStatus, nutritionConfidence i nutritionMethod rozróżniają etykietę, referencję wtórną i estymację. Rekordy best-estimate nie są oficjalnymi danymi konkretnej marki/SKU. Etykieta konkretnego opakowania ma pierwszeństwo.';
+
+// Final nutrient provenance normalization. Official Biedronka fiber values are preserved only when present in the source card.
+const OFFICIAL_BIEDRONKA_FIBER = new Map([["biedronka:0000806659", 0.6], ["biedronka:0000806658", 1.6], ["biedronka:0001222031", 0.5], ["biedronka:0001151253", 2.2], ["biedronka:0001212395", 1.1], ["biedronka:0001212396", 2.3], ["biedronka:0000798344", 0.5], ["biedronka:0000001924", 0.1], ["biedronka:0001147957", 0.2], ["biedronka:0000001922", 0.1], ["biedronka:0000011743", 0.9], ["biedronka:0000019311", 1.2], ["biedronka:0000019312", 1.1], ["biedronka:0000007204", 1.9], ["biedronka:0000002111", 2.3], ["biedronka:0000006035", 6.1], ["biedronka:0000004284", 3.9], ["biedronka:0000004180", 2.4], ["biedronka:0000003703", 2.9], ["biedronka:0000005777", 2.5], ["biedronka:0000008791", 5.3], ["biedronka:0000008562", 1.9], ["biedronka:0000005073", 2.8], ["biedronka:0000010359", 1.3], ["biedronka:0000017823", 2.7], ["biedronka:0000009831", 2.4], ["biedronka:0000007100", 2.3], ["biedronka:0000009006", 1.4]]);
+
+const FINAL_FIBER_BY_ID = {
+  banana:2.6, apple:2.4, pear:3.1, orange:2.4, mandarin:1.8, kiwi:3.0, strawberry:2.0, blueberry:2.4, raspberry:6.5, grape:0.9, plum:1.4, peach:1.5, nectarine:1.7, watermelon:0.4, melon:0.9, pineapple:1.4, mango:1.6, lemon:2.8, avocado:6.7, pomegranate:4.0, cherries:1.6, cherry:2.1, blackcurrant:6.8, cranberry:4.6,
+  tomato:1.2, 'cherry-tomato':1.2, cucumber:0.5, 'pepper-red':2.1, 'pepper-yellow':0.9, carrot:2.8, broccoli:2.6, 'broccoli-cooked':3.3, cauliflower:2.0, 'cauliflower-cooked':2.3, potato:1.8, 'potato-raw':2.2, 'sweet-potato':3.0, beetroot:2.0, onion:1.7, garlic:2.1, lettuce:1.3, spinach:2.2, zucchini:1.0, eggplant:3.0, mushroom:1.0, cabbage:2.5, 'red-cabbage':2.1, brussels:3.8, 'green-beans':3.4, peas:5.5, corn:2.7, celery:1.6, radish:1.6, leek:1.8, pumpkin:0.5, asparagus:2.1, pickles:1.0, sauerkraut:2.9, olives:3.3,
+  oats:10.6, 'oats-instant':10.1, 'oats-bran':15.4, 'oats-porridge-milk':1.7, 'cornflakes':3.3, muesli:6.5, granola:5.3, 'buckwheat-dry':10.0, 'buckwheat-cooked':2.7, 'millet-dry':8.5, 'millet-cooked':1.3, 'barley-dry':15.6, 'barley-cooked':3.8, 'bulgur-dry':12.5, 'bulgur-cooked':4.5, 'couscous-dry':5.0, 'couscous-cooked':1.4, 'quinoa-dry':7.0, 'quinoa-cooked':2.8, 'rice-dry':1.3, 'rice-cooked':0.4, 'rice-brown-dry':3.5, 'rice-brown-cooked':1.6, 'pasta-dry':3.2, 'pasta-cooked':1.8, 'pasta-whole-dry':8.0, 'pasta-whole-cooked':4.5, 'pasta-egg-dry':3.2, 'pasta-rice-dry':1.0, 'flour-wheat':2.7, 'flour-whole':10.7, 'flour-rye':14.0, semolina:3.9, breadcrumbs:4.5,
+  almonds:12.5, walnuts:6.7, cashews:3.3, peanuts:8.5, pistachio:10.6, 'pumpkin-seeds':6.0, 'sunflower-seeds':8.6, chia:34.4, flax:27.3, popcorn:14.5, sugar:0, 'olive-oil':0, 'rapeseed-oil':0, 'sunflower-oil':0, 'coconut-oil':0, butter:0, milk:0, 'milk-0':0, 'milk-3-2':0, kefir:0, yogurt:0, 'yogurt-greek':0, 'yogurt-protein':0, skyr:0, cottage:0, 'cottage-fat':0, 'cottage-fatty':0, 'cottage-cheese':0, 'cottage-cheese-light':0, egg:0, 'egg-white':0, 'egg-yolk':0,
+  chicken:0, 'chicken-cooked':0, 'chicken-grilled':0, 'chicken-fried':0, 'chicken-breaded':0, 'chicken-thigh':0, 'turkey-breast':0, 'turkey-cooked':0, 'pork-loin':0, 'pork-loin-baked':0, 'pork-tenderloin':0, 'beef-mince':0, 'beef-steak':0, 'beef-goulash':0, salmon:0, 'salmon-baked':0, cod:0, 'cod-baked':0, tuna:0, mackerel:0, sardine:0, shrimp:0,
+  lentils:7.9, 'lentils-dry':10.7, chickpeas:7.6, 'beans-white':6.3, kidney:6.4, soybeans:5.2, tofu:0.3, hummus:6.0,
+  banana:2.6, 'rice-basmati-dry':1.0, 'rice-basmati-cooked':0.4, 'rice-jasmine-dry':1.0, 'rice-jasmine-cooked':0.4, 'rice-parboiled-dry':1.0, 'rice-parboiled-cooked':0.5, 'rice-arborio-dry':1.0, 'rice-arborio-cooked':0.5, 'rice-sushi-dry':1.0, 'rice-sushi-cooked':0.5,
+};
+function finalFiberEstimate(p) {
+  const n = `${p.name||''} ${p.category||''}`.toLocaleLowerCase('pl');
+  const id = String(p.id||'').split(':').pop();
+  if (Object.prototype.hasOwnProperty.call(FINAL_FIBER_BY_ID,id)) return FINAL_FIBER_BY_ID[id];
+  if (/dynia(?!.*pest)|pumpkin(?!.*seed)/.test(n)) return 0.5;
+  if (/otręb.*owsian|oat bran/.test(n)) return 15.4;
+  if (/otręb.*pszenn|wheat bran/.test(n)) return 42.8;
+  if (/pestki dyni|pestki słonecznika|nasiona chia|siemię lniane/.test(n)) return /chia/.test(n)?34.4:/lnian|siemię/.test(n)?27.3:/dyni/.test(n)?6.0:8.6;
+  if (/makadamia/.test(n)) return 8.6;
+  if (/pekany|pekan/.test(n)) return 9.6;
+  if (/orzechy włoskie|walnuts/.test(n)) return 6.7;
+  if (/migdał/.test(n)) return 12.5;
+  if (/pistac/.test(n)) return 10.6;
+  if (/nerkow/.test(n)) return 3.3;
+  if (/orzech|fistaszk|arachid/.test(n)) return 8.5;
+  if (/popcorn/.test(n)) return 14.5;
+  if (/nachos|chipsy|chrupki/.test(n)) return 5.0;
+  if (/fasol|soczewic|ciecierzyc|groch|edamame/.test(n)) return /such|suche/.test(n)?10.5:6.5;
+  if (/mięso|kurcz|indyk|wołow|wieprz|schab|szynka|kiełbas|parów|boczek|bekon|łosoś|dorsz|tuńczyk|krewet|ryb|jaj|ser |gouda|mozzarella|feta|twaróg|skyr|jogurt|kefir|maślanka|mleko|masło|olej|oliwa|śmietan/.test(n)) return 0;
+  if (/chleb|bułk|bagiet|pieczyw|tortilla|pita|ciabatta|bajgiel|precel/.test(n)) return /pełnoziarn|razow|żytni|graham|otręb|ziarn/.test(n)?6.0:2.7;
+  if (/ryż/.test(n)) return /brąz|dziki|czerwony|czarny/.test(n)?1.8:0.5;
+  if (/makaron/.test(n)) return /pełnoziarn|razow/.test(n)?6.0:2.5;
+  if (/kasz|bulgur|quinoa|komosa|kuskus/.test(n)) return /such/.test(n)?8.0:3.0;
+  if (/owoce suszone|daktyl|fig|rodzyn|morel susz|śliwka susz/.test(n)) return 7.0;
+  if (/owoce|jabłk|gruszk|pomarańcz|banan|kiwi|jagod|malin|truskaw|borów|śliwk|winogron|mango|ananas/.test(n)) return /malin|jeżyn|porzecz|jagod/.test(n)?5.0:2.2;
+  if (/warzyw|brokuł|kalafior|kapust|marchew|burak|cukinia|papryk|pomidor|ogórek|szpinak|sałat|pieczark|fasolk|ziemniak|batat|dyni/.test(n)) return /ziemniak|batat/.test(n)?2.0:2.0;
+  if (/sos|ketchup|musztard|majonez|pesto|dżem|miód|syrop|cukier/.test(n)) return 0.5;
+  if (/napoj|sok|cola|lemoniad|woda|herbata|kawa/.test(n)) return 0;
+  if (/dania gotowe|mrożone|gotowe|pizza|pierog|zapiek|lasagne/.test(n)) return 2.2;
+  return 1.5;
+}
+const NUTRITION_FRAMEWORKS = [
+  'https://fdc.nal.usda.gov/',
+  'https://frida.fooddata.dk/',
+  'https://www.pzh.gov.pl/uslugi/tabele-wartosci-odzywczej-produktow/'
+];
+for (const p of products) {
+  const originalOfficialFiber = OFFICIAL_BIEDRONKA_FIBER.has(p.id);
+  if (originalOfficialFiber) p.fiber100 = OFFICIAL_BIEDRONKA_FIBER.get(p.id);
+  else p.fiber100 = finalFiberEstimate(p);
+  p.fiber100 = Math.max(0,Math.round(Number(p.fiber100)*10)/10);
+  const isRetailLabel = p.sourceKind === 'retailer-official';
+  const isPublished = p.sourceKind === 'published-reference';
+  const energyWasMissingInRetailSource = p.id === 'biedronka:0001174361';
+  const energySource = isRetailLabel && !energyWasMissingInRetailSource && Number.isFinite(Number(p.kcal100)) ? 'official-retailer-card' : isPublished ? 'published-secondary' : 'estimated-reference';
+  const macrosEstimated = p.nutritionStatus === 'official-energy-estimated-macros' || p.nutritionStatus === 'estimated-all-fields';
+  const macroSource = isRetailLabel && !macrosEstimated ? 'official-retailer-card' : isPublished ? 'published-secondary' : 'estimated-reference';
+  p.nutrientProvenance = {
+    energy100: energySource,
+    protein100: macroSource,
+    fat100: macroSource,
+    carbs100: macroSource,
+    fiber100: originalOfficialFiber ? 'official-retailer-card' : 'estimated-reference'
+  };
+  if (p.sourceKind === 'generic-reference' || (p.id.startsWith('catalog-') && p.sourceKind === 'retailer-assortment-reference')) {
+    // Category-index rows are copies of the generic USDA-style records. Normalize them identically.
+    p.totalCarbsIncludingFiber100 = Number(p.carbs100);
+    p.carbs100 = Math.max(0,Math.round((Number(p.carbs100)-Number(p.fiber100))*10)/10);
+    p.carbsConvention = 'available-carbohydrate; fiber reported separately; normalized from total carbohydrate where source uses USDA convention';
+  } else {
+    p.carbsConvention = 'available-carbohydrate; fiber reported separately';
+  }
+  p.referenceFrameworks = NUTRITION_FRAMEWORKS;
+  p.sourceRefs = (isRetailLabel || isPublished) && p.sourceUrl ? [p.sourceUrl] : [];
+  p.nutritionCheckedAt = '2026-11-22';
+  if (originalOfficialFiber && !energyWasMissingInRetailSource) p.nutritionStatus = 'retailer-label-complete';
+  else if (isRetailLabel && energyWasMissingInRetailSource) p.nutritionStatus = 'estimated-all-fields';
+  else if (isRetailLabel && macrosEstimated) p.nutritionStatus = 'official-energy-estimated-macros-and-fiber';
+  else if (isRetailLabel) p.nutritionStatus = 'official-energy-macros-estimated-fiber';
+  else if (isPublished) p.nutritionStatus = 'secondary-published-reference';
+  else p.nutritionStatus = 'best-estimate';
+  if (p.nutritionStatus === 'best-estimate') p.nutritionConfidence = 'low-to-medium; category estimate, not SKU label';
+  if (isRetailLabel && !originalOfficialFiber) p.dataNote = `${p.dataNote||''} Kcal ${energySource==='official-retailer-card'?'pochodzą z oficjalnej karty':''}; błonnik oszacowany, a makroskładniki mogą być estymowane zgodnie z nutrientProvenance.`;
+}
+// Retailer index rows are deliberate aliases of a generic reference item, not separate nutrition analyses.
+// Copy the final normalized values from the generic base row so the same food cannot disagree by store.
+const genericBaseById = new Map(products.filter(p=>p.store==='Ogólne').map(p=>[p.id,p]));
+for (const p of products.filter(x=>x.id.startsWith('catalog-'))) {
+  const baseId = p.id.replace(/^catalog-(lidl|biedronka|kaufland|carrefour)-/, '');
+  const base = genericBaseById.get(baseId);
+  if (!base) continue;
+  for (const k of ['kcal100','protein100','fat100','carbs100','fiber100']) p[k] = base[k];
+  if (base.totalCarbsIncludingFiber100 !== undefined) p.totalCarbsIncludingFiber100 = base.totalCarbsIncludingFiber100;
+  p.carbsConvention = base.carbsConvention;
+  p.referenceBaseId = base.id;
+  p.nutrientProvenance = {energy100:'estimated-reference',protein100:'estimated-reference',fat100:'estimated-reference',carbs100:'estimated-reference',fiber100:'estimated-reference'};
+  p.nutritionMethod = 'Wartości na 100 g odziedziczone z odpowiadającej pozycji ogólnej; indeks sklepu potwierdza nazwę/asortyment, nie etykietę ani parametry konkretnego SKU.';
+  p.nutritionStatus = 'best-estimate';
+  p.nutritionConfidence = 'low-to-medium; generic food reference reused for store assortment index';
+  p.dataNote = `${p.dataNote||''} Wartości żywieniowe są skopiowane z ogólnej pozycji referencyjnej ${base.id}; nie są pomiarem ani etykietą konkretnego produktu sklepowego.`;
+}
+productCatalogInfo.count = products.length;
+productCatalogInfo.generic = products.filter(p=>p.store==='Ogólne').length;
+productCatalogInfo.storeCount = products.length-productCatalogInfo.generic;
+productCatalogInfo.nutritionQuality = {
+  officialEnergyRows:products.filter(p=>p.nutrientProvenance.energy100==='official-retailer-card').length,
+  fullyOfficialFiveNutrientRows:products.filter(p=>Object.values(p.nutrientProvenance).every(v=>v==='official-retailer-card')).length,
+  officialEnergyEstimatedMacrosOrFiber:products.filter(p=>p.nutrientProvenance.energy100==='official-retailer-card' && Object.values(p.nutrientProvenance).some(v=>v!=='official-retailer-card')).length,
+  publishedSecondaryRows:products.filter(p=>p.nutritionStatus==='secondary-published-reference').length,
+  estimatedRows:products.filter(p=>p.nutritionStatus==='best-estimate').length,
+  estimatedFiberRows:products.filter(p=>p.nutrientProvenance.fiber100==='estimated-reference').length
+};
+productCatalogInfo.version = '2026-11-22.2';
+productCatalogInfo.auditDate = '2026-11-22';
+productCatalogInfo.note = 'Wszystkie pola kcal, białka, tłuszczu, węglowodanów i błonnika są liczbowe. `nutrientProvenance` określa pochodzenie każdego pola oddzielnie; liczby szacunkowe nie są etykietą konkretnego SKU. Wartości węglowodanów są normalizowane do węglowodanów przyswajalnych, błonnik jest osobnym polem. Dla produktów pakowanych nadrzędna jest etykieta konkretnego opakowania.';
+
+const pinsaNoData = products.find(p=>p.id==='biedronka:0001174361');
+if (pinsaNoData) { pinsaNoData.dataNote = 'Oficjalna karta produktu zawierała wartości 0 będące placeholderem; nie uzyskano wiarygodnej etykiety liczbowej. Wszystkie pola żywieniowe, w tym kcal, są oszacowane dla podobnej pinsy; nie są to dane producenta.'; pinsaNoData.nutritionMethod = 'Cały profil odżywczy oszacowany od zbliżonych produktów piekarniczych/pizza; brak wiarygodnej deklaracji konkretnego SKU.'; pinsaNoData.nutritionConfidence = 'low'; }
+productCatalogInfo.nutritionQuality.estimatedRows = products.filter(p=>p.nutrientProvenance.energy100==='estimated-reference').length;
+productCatalogInfo.nutritionQuality.officialEnergyEstimatedMacrosOrFiber = products.filter(p=>p.nutrientProvenance.energy100==='official-retailer-card' && Object.values(p.nutrientProvenance).some(v=>v!=='official-retailer-card')).length;

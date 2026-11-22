@@ -1,4 +1,4 @@
-const VERSION='3.35';
+const VERSION='3.46';
 const CACHE=`dziennik-zywieniowy-v${VERSION}`;
 const ASSETS=['./','./index.html','./css/styles.css','./js/app.js','./js/products.js','./js/dishes.js','./js/plans.js','./js/profile-utils.js','./js/catalog.js','./js/api.js','./js/firebase-config.js','./js/firebase-sync.js','./assets/icon.svg','./assets/logo.png','./manifest.webmanifest'].map(path=>path==='./'?`./?v=${VERSION}`:`${path}?v=${VERSION}`);
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));

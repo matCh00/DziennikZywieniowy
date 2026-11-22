@@ -33,13 +33,13 @@ function goalHint(goal,metrics){
   if(value===0)return metrics?`Utrzymanie · tyle kalorii, ile organizm zużywa w ciągu dnia (TDEE): ok. ${fmt(metrics.tdee)} kcal.`:'Utrzymanie · tyle kalorii, ile organizm zużywa w ciągu dnia (TDEE).';
   const base=`Deficyt ${value}% · ${value}% mniej kalorii niż organizm zużywa w ciągu dnia (TDEE).`;
   if(!metrics)return base;
-  return `${base} Cel ok. ${fmt(metrics.target)} kcal${metrics.target<=metrics.ree+1?' (nie mniej niż REE)':''}.`;
+  return `${base} Limit ok. ${fmt(metrics.target)} kcal${metrics.target<=metrics.ree+1?' (nie mniej niż REE)':''}.`;
 }
 
 const mealNames=['Śniadanie','II śniadanie','Obiad','Podwieczorek','Kolacja','Przekąski'];
-const defaultState=()=>({activeProfile:'female',profiles:{female:null,male:null},logs:{female:{},male:{}},weights:{female:[],male:[]},customProducts:[],recipes:[],plans:[],workerUrl:'',catalogMode:'saved',onlineSource:'fatsecret'});
-let state=defaultState();let firebaseSync=null;let firebaseSaveTimer=null;let selectedProduct=null;let portalResults=[];let portalInput=null;let searchGeneration=0;let toastTimer;let productsFilterTimer;let editingRecipeId=null;let editingPlanId=null;let editingProductId=null;let productsLimit=48;let productsQuery="";let productsStore='all';let dishesLimit=10;let dishesQuery="";
-function loadState(key=userStoreKey||STORE_KEY){try{const x=JSON.parse(localStorage.getItem(key)||'null');return x&&typeof x==='object'?{...defaultState(),...x,profiles:{...defaultState().profiles,...(x.profiles||{})},logs:{...defaultState().logs,...(x.logs||{})},weights:{...defaultState().weights,...(x.weights||{})}}:defaultState();}catch{return defaultState();}}
+const defaultState=()=>({activeProfile:'female',profiles:{female:null,male:null},logs:{female:{},male:{}},weights:{female:[],male:[]},customProducts:[],recipes:[],plans:[],vessels:[],favorites:{products:[],dishes:[]},overrides:{products:{},dishes:{}},pendingShare:null,workerUrl:'',catalogMode:'saved',onlineSource:'fatsecret'});
+let state=defaultState();let firebaseSync=null;let firebaseSaveTimer=null;let selectedProduct=null;let portalResults=[];let portalBaseResults=[];let portalInput=null;let searchGeneration=0;let toastTimer;let productsFilterTimer;let editingRecipeId=null;let editingPlanId=null;let editingProductId=null;let productsLimit=20;let productsQuery="";let productsStore='all';let dishesLimit=20;let dishesQuery="";
+function loadState(key=userStoreKey||STORE_KEY){try{const x=JSON.parse(localStorage.getItem(key)||'null');return x&&typeof x==='object'?{...defaultState(),...x,profiles:{...defaultState().profiles,...(x.profiles||{})},logs:{...defaultState().logs,...(x.logs||{})},weights:{...defaultState().weights,...(x.weights||{})},vessels:Array.isArray(x.vessels)?x.vessels:[]}:defaultState();}catch{return defaultState();}}
 function save(){try{if(!userStoreKey)return;localStorage.setItem(userStoreKey,JSON.stringify(state));$('saveState').innerHTML=firebaseSync?'<i></i> Zapisano · synchronizacja':'<i></i> Zapisano';}catch{$('saveState').innerHTML='<i style="background:#c47d52"></i> Brak miejsca';}if(firebaseSync){clearTimeout(firebaseSaveTimer);const sync=firebaseSync;const snapshot=JSON.parse(JSON.stringify(state));firebaseSaveTimer=setTimeout(()=>{if(firebaseSync!==sync)return;sync.save(snapshot).then(()=>{if(firebaseSync===sync)$('saveState').innerHTML='<i></i> Zsynchronizowano';}).catch(()=>{if(firebaseSync===sync)$('saveState').innerHTML='<i style="background:#c47d52"></i> Błąd synchronizacji';});},700);}}
 function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2700);}
 function activeProfile(){return state.activeProfile;}
@@ -55,14 +55,14 @@ function profileMetrics(p,sex){if(!p)return null;const W=Number(p.weight),H=Numb
 }
 function bmiText(bmi){if(bmi<18.5)return 'niedowaga';if(bmi<25)return 'zakres prawidłowy';if(bmi<30)return 'nadwaga';if(bmi<35)return 'otyłość I stopnia';if(bmi<40)return 'otyłość II stopnia';return 'otyłość III stopnia';}
 function render(){
-  const date=$('entryDate').value||today();const p=profile();const metrics=profileMetrics(p,activeProfile());const day=ensureDay(date);const consumed=day.entries.reduce((s,e)=>s+Number(e.kcal||0),0);const target=metrics?Math.round(metrics.target):null;const remain=target===null?null:target-consumed;
+  const date=$('entryDate').value||today();const p=profile();const metrics=profileMetrics(p,activeProfile());const day=ensureDay(date);const consumed=day.entries.reduce((s,e)=>s+Number(e.kcal||0),0);const target=metrics?Math.round(metrics.target):null;const remain=target===null?null:target-consumed;const over=remain!==null&&remain<0;
   $('consumed').innerHTML=`${fmt(consumed)} <small>kcal</small>`;$('dailyTarget').innerHTML=target===null?'—':`${fmt(target)} <small>kcal</small>`;
-  $('remaining').textContent=remain===null?'—':fmt(Math.abs(remain));$('balance').textContent=remain===null?'—':remain>=0?`${fmt(remain)} kcal`:`+${fmt(-remain)} kcal`; $('balance').style.color=remain!==null&&remain<0?'var(--red)':'var(--green)';
-  $('targetHint').textContent=metrics?remain>=0?`Do celu pozostało ${fmt(remain)} kcal.`:`Przekroczono cel o ${fmt(-remain)} kcal.`:'Uzupełnij parametry profilu, aby obliczyć dzienny cel.';
-  const pct=target?Math.min(100,consumed/target*100):0;$('progressBar').style.width=`${pct}%`;$('progressText').textContent=`${Math.round(pct)}% celu`;$('progressTarget').textContent=target?`${fmt(target)} kcal`: 'cel';$('calorieRing').style.background=`conic-gradient(${remain!==null&&remain<0?'#bd6758':'var(--profile-accent, var(--green))'} ${pct*3.6}deg,#e8efe8 ${pct*3.6}deg)`;
+  $('remaining').textContent=remain===null?'—':fmt(Math.abs(remain));$('remainingLabel').textContent=over?'kcal ponad limit':'kcal pozostało';$('balance').textContent=remain===null?'—':over?`${fmt(-remain)} kcal ponad`:`${fmt(remain)} kcal`; $('balance').style.color=over?'var(--red)':'var(--green)';$('calorieBadge').textContent=remain===null?'Brak limitu':over?'Ponad limit':'W limicie';$('calorieBadge').classList.toggle('is-over',over);$('calorieRing').classList.toggle('is-over',over);
+  $('targetHint').textContent=metrics?over?`Przekroczono limit o ${fmt(-remain)} kcal.`:`Do limitu pozostało ${fmt(remain)} kcal.`:'Uzupełnij parametry profilu, aby obliczyć dzienny limit.';
+  const pct=target?consumed/target*100:0;const ringPct=Math.min(100,pct);$('progressBar').style.width=`${Math.min(100,pct)}%`;$('progressText').textContent=target?`${fmt(pct,0)}% limitu`:'—% limitu';$('progressTarget').textContent=target?`${fmt(target)} kcal`:'limit';$('calorieProgress').classList.toggle('is-over',over);$('progressBar').classList.toggle('is-over',over);$('calorieRing').style.background=`conic-gradient(${over?'#bd6758':'var(--profile-accent, var(--green))'} ${ringPct*3.6}deg,#e8efe8 ${ringPct*3.6}deg)`;
   $('ree').textContent=metrics?fmt(Math.round(metrics.ree)):'—';$('tdee').textContent=metrics?fmt(Math.round(metrics.tdee)):'—';$('bmi').textContent=metrics?fmt(metrics.bmi,1):'—';$('bmiLabel').textContent=metrics?bmiText(metrics.bmi):'uzupełnij profil';
   const weightList=state.weights[activeProfile()]||[];const latest=weightList.at(-1);$('weightNow').textContent=latest?fmt(latest.weight,1):metrics?fmt(metrics.weight,1):'—';
-  $('profileSummary').innerHTML=metrics?`<div><strong>${p.age} lat · ${p.height} cm · ${p.weight} kg</strong><p class="muted">Aktywność: ${(PAL_LABELS[String(p.pal)]||'własna').toLowerCase()} (PAL ${palValue(p.pal)}) · Cel: ${fmt(metrics.target)} kcal / dobę ${p.goal===0?'(utrzymanie)':`(deficyt ${p.goal}%)`}</p></div><button class="primary" id="setupProfile">${ico('pencil')} Edytuj parametry</button>`:`<div><strong>Skonfiguruj profil</strong><p class="muted">Wiek, wzrost, masa ciała i aktywność pozwolą oszacować zapotrzebowanie energetyczne.</p></div><button class="primary" id="setupProfile">${ico('plus')} Uzupełnij profil</button>`;
+  $('profileSummary').innerHTML=metrics?`<div><strong>${p.age} lat · ${p.height} cm · ${p.weight} kg</strong><p class="muted">Aktywność: ${(PAL_LABELS[String(p.pal)]||'własna').toLowerCase()} (PAL ${palValue(p.pal)}) · Limit: ${fmt(metrics.target)} kcal / dobę ${p.goal===0?'(utrzymanie)':`(deficyt ${p.goal}%)`}</p></div><button class="primary" id="setupProfile">${ico('pencil')} Edytuj parametry</button>`:`<div><strong>Skonfiguruj profil</strong><p class="muted">Wiek, wzrost, masa ciała i aktywność pozwolą oszacować zapotrzebowanie energetyczne.</p></div><button class="primary" id="setupProfile">${ico('plus')} Uzupełnij profil</button>`;
   $('setupProfile').onclick=openProfileDialog;
   renderMeals(day);renderHydration(day);renderWeekStats();renderWeights();renderPlanDaySummary();
 }
@@ -104,8 +104,81 @@ function groupMacroText(entries){
   return `B ${fmt(t.p,0)} · T ${fmt(t.f,0)} · W ${fmt(t.c,0)} g`;
 }
 function renderHydration(day){$('waterValue').textContent=fmt(day.water||0);$('waterBar').style.width=`${Math.min(100,(day.water||0)/2000*100)}%`;}
-function renderWeekStats(){const date=$('entryDate').value||today();let vals=[];for(let i=6;i>=0;i--){const d=dayShift(date,-i);const entries=state.logs[activeProfile()][d]?.entries||[];vals.push({d,kcal:entries.reduce((s,e)=>s+(e.kcal||0),0)});}
-  const max=Math.max(2000,...vals.map(x=>x.kcal));$('weekBars').innerHTML=vals.map(v=>`<div class="bar-day"><div class="bar-track"><span style="height:${v.kcal?Math.max(4,v.kcal/max*100):0}%"></span></div><small>${new Intl.DateTimeFormat('pl-PL',{weekday:'short'}).format(new Date(`${v.d}T12:00:00`)).replace('.','')}</small></div>`).join('');const withEntries=vals.filter(v=>v.kcal>0);$('weekAverage').textContent=withEntries.length?`${fmt(withEntries.reduce((s,v)=>s+v.kcal,0)/withEntries.length)} kcal`:'— kcal';}
+let statsRange='7';
+function statsKcal(date){const entries=state.logs[activeProfile()]?.[date]?.entries||[];return {kcal:entries.reduce((s,e)=>s+Number(e.kcal||0),0),has:entries.length>0};}
+function loggedDates(){const logs=state.logs[activeProfile()]||{};return Object.keys(logs).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&Array.isArray(logs[d]?.entries)&&logs[d].entries.length>0).sort();}
+function statsRangeStart(range,endDate){if(range==='7')return dayShift(endDate,-6);if(range==='30')return dayShift(endDate,-29);const end=new Date(`${endDate}T12:00:00`);const dow=(end.getDay()+6)%7;return dayShift(dayShift(endDate,-dow),-84);}
+function statsWindowDates(range,endDate){if(range==='all')return loggedDates().filter(d=>d<=endDate);const start=statsRangeStart(range,endDate);const out=[];let d=start;let guard=0;while(d<=endDate&&guard++<400){out.push(d);d=dayShift(d,1);}return out;}
+function weekdayShort(iso){return new Intl.DateTimeFormat('pl-PL',{weekday:'short'}).format(new Date(`${iso}T12:00:00`)).replace('.','');}
+function shortDate(iso){return new Intl.DateTimeFormat('pl-PL',{day:'2-digit',month:'2-digit'}).format(new Date(`${iso}T12:00:00`));}
+function monthShort(key){return new Intl.DateTimeFormat('pl-PL',{month:'short',year:'2-digit'}).format(new Date(`${key}-01T12:00:00`));}
+function monthLong(key){return new Intl.DateTimeFormat('pl-PL',{month:'long',year:'numeric'}).format(new Date(`${key}-01T12:00:00`));}
+function statsBuckets(range,endDate){
+  const out=[];
+  if(range==='7'||range==='30'){
+    const n=range==='7'?7:30;
+    for(let i=n-1;i>=0;i--){const d=dayShift(endDate,-i);const info=statsKcal(d);if(!info.has)continue;out.push({label:range==='7'?weekdayShort(d):d.slice(8,10),title:`${formatDay(d)} · ${fmt(info.kcal)} kcal`,kcal:info.kcal});}
+    return out;
+  }
+  if(range==='90'){
+    const end=new Date(`${endDate}T12:00:00`);const dow=(end.getDay()+6)%7;const monday=dayShift(endDate,-dow);
+    for(let w=12;w>=0;w--){
+      const start=dayShift(monday,-7*w);let total=0,days=0,first='',last='';
+      for(let i=0;i<7;i++){const d=dayShift(start,i);if(d>endDate)break;const info=statsKcal(d);if(!info.has)continue;total+=info.kcal;days++;first=first||d;last=d;}
+      if(!days)continue;
+      out.push({label:shortDate(start),kicker:'tydz.',title:`Tydzień ${formatDay(first)} – ${formatDay(last)} · średnio ${fmt(total/days)} kcal/dzień`,kcal:total/days});
+    }
+    return out;
+  }
+  const byMonth=new Map();
+  for(const d of loggedDates().filter(x=>x<=endDate)){const info=statsKcal(d);if(!info.has)continue;const key=d.slice(0,7);const bucket=byMonth.get(key)||{total:0,days:0};bucket.total+=info.kcal;bucket.days++;byMonth.set(key,bucket);}
+  return [...byMonth.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,b])=>({label:monthShort(key),title:`${monthLong(key)} · ${b.days} ${b.days===1?'dzień':'dni'} z danymi · średnio ${fmt(b.total/b.days)} kcal/dzień`,kcal:b.total/b.days}));
+}
+function statsSummary(range,endDate,limit){
+  let days=0,total=0,inLimit=0,over=0,deficit=0,surplus=0;
+  for(const d of statsWindowDates(range,endDate)){const info=statsKcal(d);if(!info.has)continue;days++;total+=info.kcal;if(limit!==null){if(info.kcal<=limit){inLimit++;deficit+=limit-info.kcal;}else{over++;surplus+=info.kcal-limit;}}}
+  return {days,total,inLimit,over,deficit,surplus,average:days?total/days:null};
+}
+function renderWeekStats(){
+  const date=$('entryDate').value||today();
+  const metrics=profileMetrics(profile(),activeProfile());
+  const limit=metrics?Math.round(metrics.target):null;
+  const buckets=statsBuckets(statsRange,date);
+  const summary=statsSummary(statsRange,date,limit);
+  const maxValue=Math.max(limit||0,...buckets.map(b=>b.kcal),1);
+  const scale=Math.max(1000,maxValue*1.08);
+  $('statsLimitValue').textContent=limit?`${fmt(limit)} kcal`:'brak limitu';
+  $('statsLegend').classList.toggle('is-empty',limit===null);
+  $('statsChart').style.setProperty('--label-h',statsRange==='90'?'37px':'30px');$('statsChart').style.setProperty('--bar-min',statsRange==='30'?'14px':statsRange==='90'?'28px':statsRange==='all'?'32px':'11px');$('statsChart').classList.toggle('is-dense',statsRange==='30');
+  const statsNotes={
+    '7':'Zakres 7 dni do wybranej daty. Słupek = jeden dzień; wartość to kcal z tego dnia. Puste dni są pomijane.',
+    '30':'Zakres 30 dni do wybranej daty. Słupek = jeden dzień; wartość to kcal z tego dnia. Puste dni są pomijane.',
+    '90':'Zakres 90 dni (13 tygodni). Słupek = jeden tydzień; podpis to data poniedziałku, a wartość to średnia dzienna z dni z posiłkami. Puste tygodnie są pomijane; bieżący tydzień może być niepełny.',
+    all:'Wszystkie zapisane dni do wybranej daty. Słupek = jeden miesiąc; wartość to średnia dzienna z dni z posiłkami. Puste miesiące są pomijane; bieżący miesiąc może być niepełny.'
+  };
+  $('statsNote').classList.remove('hidden');
+  $('statsNote').textContent=statsNotes[statsRange];
+  const line=$('statsLimitLine');
+  line.classList.toggle('hidden',limit===null||!buckets.length);
+  if(limit!==null&&buckets.length){line.style.bottom=`calc(var(--label-h) + var(--bar-h) * ${Math.min(1,limit/scale).toFixed(4)})`;line.querySelector('span').textContent=`limit ${fmt(limit)} kcal`;}
+  $('weekBars').innerHTML=buckets.length?buckets.map(b=>{
+    const isOver=limit!==null&&b.kcal>limit;
+    const height=Math.max(3,Math.min(100,b.kcal/scale*100));
+    const detail=limit===null?'':isOver?` · +${fmt(b.kcal-limit)} kcal ponad limit`:` · ${fmt(limit-b.kcal)} kcal do limitu`;
+    const valueText=statsRange==='30'?fmt(b.kcal).replace(/\s/g,''):fmt(b.kcal);
+    return `<div class="bar-day ${isOver?'is-over':'is-in'}" title="${escapeHTML(b.title)}${detail}"><div class="bar-track"><span style="height:${height}%"></span></div><small class="bar-day-label">${b.kicker?`<span class="bar-day-kicker">${escapeHTML(b.kicker)}</span>`:''}<span>${escapeHTML(b.label)}</span></small><small class="bar-day-kcal">${valueText}</small></div>`;
+  }).join(''):`<div class="stats-empty">Brak zapisanych posiłków w tym zakresie. Dodaj coś w dzienniku, aby zobaczyć statystyki.</div>`;
+  $('weekAverage').textContent=summary.average===null?'— kcal':`${fmt(summary.average)} kcal`;
+  $('statsInLimit').textContent=limit===null||!summary.days?'—':`${summary.inLimit} z ${summary.days}`;
+  $('statsOverLimit').textContent=limit===null||!summary.days?'—':`${summary.over} z ${summary.days}`;
+  $('statsBalance').classList.toggle('hidden',limit===null||!summary.days);
+  $('statsDeficit').textContent=summary.deficit?`−${fmt(summary.deficit)} kcal`:'0 kcal';
+  $('statsOver').textContent=summary.surplus?`+${fmt(summary.surplus)} kcal`:'0 kcal';
+  const net=summary.deficit-summary.surplus;
+  $('statsNet').textContent=net===0?'0 kcal':net>0?`−${fmt(net)} kcal`:`+${fmt(-net)} kcal`;
+  $('statsNet').classList.toggle('is-deficit',net>0);$('statsNet').classList.toggle('is-over',net<0);
+  document.querySelectorAll('[data-stats-range]').forEach(button=>{const active=button.dataset.statsRange===statsRange;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});
+}
 function renderWeights(){const items=state.weights[activeProfile()]||[];$('weightHistory').innerHTML=items.length?items.slice(-4).reverse().map(x=>`<div><span>${escapeHTML(x.date)}</span><b>${fmt(x.weight,1)} kg</b></div>`).join(''):'Brak zapisanych pomiarów.';}
 function escapeHTML(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function openProfileDialog(){const form=$('profileForm');form.reset();const p=profile();if(p){for(const k of ['age','height','weight','pal','goal'])form.elements[k].value=p[k];}else{form.elements.pal.value='1.6';form.elements.goal.value='10';} $('profileError').textContent='';updateProfileHints();$('profileDialog').showModal();}
@@ -143,10 +216,59 @@ function openBothProfilesDialog(){
   $('setupBothDialog').showModal();
 }
 
-function setProfile(id){state.activeProfile=id;document.body.dataset.profile=id;document.querySelectorAll('.profile-tab').forEach(b=>b.classList.toggle('active',b.dataset.profile===id));render();closePortal();save();}
+function setProfile(id){state.activeProfile=id;document.body.dataset.profile=id;document.querySelectorAll('.profile-tab').forEach(b=>b.classList.toggle('active',b.dataset.profile===id));render();closePortal();save();maybeOfferShare();}
 const catalogProducts=products;
 const catalogDishes=dishes.map(dishAsRecipe);
-function allKnownProducts(){return [...catalogProducts,...state.customProducts];}
+const uid=()=>crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`;
+function favourites(){
+  if(!state.favorites||typeof state.favorites!=='object')state.favorites={products:[],dishes:[]};
+  if(!Array.isArray(state.favorites.products))state.favorites.products=[];
+  if(!Array.isArray(state.favorites.dishes))state.favorites.dishes=[];
+  return state.favorites;
+}
+function isFavorite(kind,id){return Boolean(id)&&favourites()[kind].includes(String(id));}
+function setFavorite(kind,id,on){const store=favourites();const key=String(id);store[kind]=on?[key,...store[kind].filter(x=>x!==key)]:store[kind].filter(x=>x!==key);}
+function toggleFavorite(kind,id){setFavorite(kind,id,!isFavorite(kind,id));save();}
+function favoritesFirst(list,kind){return [...list].sort((a,b)=>Number(isFavorite(kind,b.id))-Number(isFavorite(kind,a.id)));}
+function overrideStore(){
+  if(!state.overrides||typeof state.overrides!=='object')state.overrides={products:{},dishes:{}};
+  if(!state.overrides.products||typeof state.overrides.products!=='object')state.overrides.products={};
+  if(!state.overrides.dishes||typeof state.overrides.dishes!=='object')state.overrides.dishes={};
+  return state.overrides;
+}
+function productOverride(id){return overrideStore().products[String(id)]||null;}
+function dishOverride(id){return overrideStore().dishes[String(id)]||null;}
+function numOrNull(value){if(value===null||value===undefined||value==='')return null;const n=Number(value);return Number.isFinite(n)?n:null;}
+function applyProductOverride(product){
+  if(!product)return product;
+  const over=productOverride(product.id);
+  if(!over)return product;
+  const out={...product,overridden:true};
+  for(const key of ['kcal100','protein100','fat100','carbs100']){const value=numOrNull(over[key]);if(value!==null)out[key]=value;}
+  return out;
+}
+function applyProductList(list){return (list||[]).map(applyProductOverride);}
+function allKnownProducts(){return applyProductList([...catalogProducts,...(state.customProducts||[])]);}
+function dishOverrideValues(dish){
+  const over=dish?dishOverride(dish.id):null;
+  if(!over)return null;
+  const out={};
+  for(const key of ['kcal','protein','fat','carbs']){const value=numOrNull(over[key]);if(value!==null)out[key]=value;}
+  return Object.keys(out).length?out:null;
+}
+function dishPerPortionKcal(dish){
+  if(!dish)return 0;
+  const over=dishOverrideValues(dish);
+  if(over&&over.kcal!==undefined)return over.kcal;
+  return !dish.type?(Number(dish.totalKcal)||0)/Math.max(1,Number(dish.portions)||1):(Number(dish.kcal)||0);
+}
+function queueShare(item){
+  if(!item||!(Number(item.grams)>0))return;
+  if(!state.pendingShare||state.pendingShare.from!==activeProfile())state.pendingShare={from:activeProfile(),items:[]};
+  const items=Array.isArray(state.pendingShare.items)?state.pendingShare.items:[];
+  items.push({id:uid(),kind:item.kind||'item',sourceId:item.id||'',name:item.name||'Pozycja',meal:item.meal||'',date:item.date||$('entryDate').value||today(),grams:Number(item.grams),composition:item.composition});
+  state.pendingShare.items=items;
+}
 function dishAsRecipe(dish){
   const grams=Math.max(1,Number(dish.servingWeight)||100);
   const per100=value=>value===null||value===undefined?null:round1(Number(value)*100/grams);
@@ -154,7 +276,7 @@ function dishAsRecipe(dish){
 }
 function allDishes(){return [...catalogDishes,...(state.recipes||[])];}
 function getDishById(id){return allDishes().find(d=>d.id===id)||null;}
-function getProductById(id){return allKnownProducts().find(p=>p.id===id)||null;}
+function getProductById(id){const found=[...catalogProducts,...(state.customProducts||[])].find(p=>p.id===id);return found?applyProductOverride(found):null;}
 function safeImage(url){try{const u=new URL(url);return u.protocol==='https:'?u.href:'';}catch{return '';}}
 function categoryIcon(p){const c=String(p.category||'').toLowerCase(),n=String(p.name||'').toLowerCase(),v=c+' '+n;
   if(/ryb|łosoś|tunczyk|śledź|dorsz|mintaj|pstrąg|krewetk|owoc morza/.test(v))return ico('fish');
@@ -177,9 +299,9 @@ async function savedSearch(q){const local=allKnownProducts().map(p=>({...p,searc
   const map=new Map();for(const p of [...local,...imported.map(x=>({...x,category:x.category||'Produkty spożywcze',store:x.stores||x.store||'Open Food Facts',source:'Open Food Facts'}))]){if(!map.has(p.id))map.set(p.id,p);}return [...map.values()].sort((a,b)=>(scoreMatch(b,q))-(scoreMatch(a,q))).slice(0,40);
 }
 function positionPortal(){if(!portalInput||$('resultsPortal').classList.contains('hidden'))return;const rect=portalInput.getBoundingClientRect();const el=$('resultsPortal');const margin=10;const maxH=Math.min(420,window.innerHeight-margin*2);const below=window.innerHeight-rect.bottom-margin;const above=rect.top-margin;const placeAbove=below<Math.min(180,maxH)&&above>below;const h=Math.max(90,Math.min(maxH,placeAbove?above:below));el.style.left=`${Math.max(margin,Math.min(rect.left,window.innerWidth-rect.width-margin))}px`;el.style.width=`${Math.min(rect.width,window.innerWidth-margin*2)}px`;el.style.maxHeight=`${h}px`;el.style.top=placeAbove?`${Math.max(margin,rect.top-h-6)}px`:`${Math.min(rect.bottom+6,window.innerHeight-h-margin)}px`;}
-function openPortal(input,items,message=''){portalInput=input;const el=$('resultsPortal');el.innerHTML=message?`<div class="portal-message">${escapeHTML(message)}</div>`:items.length?items.map((p,i)=>`<button class="result-item" type="button" role="option" data-result="${i}">${safeImage(p.image)?`<img src="${escapeHTML(safeImage(p.image))}" alt="" loading="lazy" referrerpolicy="no-referrer">`:`<span class="result-placeholder">${categoryIcon(p)}</span>`}<span class="result-copy"><b>${escapeHTML(p.name)}</b><small>${escapeHTML([p.brand,p.store||p.source,p.source].filter(Boolean).join(' · '))}</small></span><span class="result-kcal">${fmt(p.kcal100)} kcal</span></button>`).join(''):'<div class="portal-message">Brak wyników. Spróbuj innej nazwy albo zmień źródło.</div>';
-  portalResults=items;el.classList.remove('hidden');positionPortal();}
-function closePortal(){const el=$('resultsPortal');el.classList.add('hidden');el.innerHTML='';portalInput=null;portalResults=[];}
+function openPortal(input,items,message=''){portalInput=input;const el=$('resultsPortal');portalBaseResults=(items||[]).map(applyProductOverride);const sorted=favoritesFirst(portalBaseResults,'products');el.innerHTML=message?`<div class="portal-message">${escapeHTML(message)}</div>`:sorted.length?sorted.map((p,i)=>`<div class="result-item${isFavorite('products',p.id)?' is-favorite':''}" role="option" tabindex="0" data-result="${i}">${safeImage(p.image)?`<img src="${escapeHTML(safeImage(p.image))}" alt="" loading="lazy" referrerpolicy="no-referrer">`:`<span class="result-placeholder">${categoryIcon(p)}</span>`}<span class="result-copy"><b>${escapeHTML(p.name)}</b><small>${escapeHTML([p.brand,p.store||p.source,p.source].filter(Boolean).join(' · '))}</small></span><span class="result-kcal">${fmt(p.kcal100)} kcal</span><button type="button" class="fav-toggle result-fav${isFavorite('products',p.id)?' active':''}" data-fav-product="${escapeHTML(p.id)}" aria-pressed="${isFavorite('products',p.id)}" aria-label="${isFavorite('products',p.id)?'Usuń produkt z ulubionych':'Dodaj produkt do ulubionych'}" title="${isFavorite('products',p.id)?'Usuń z ulubionych':'Dodaj do ulubionych'}">${ico('star')}</button></div>`).join(''):'<div class="portal-message">Brak wyników. Spróbuj innej nazwy albo zmień źródło.</div>';
+  portalResults=sorted;el.classList.remove('hidden');positionPortal();}
+function closePortal(){const el=$('resultsPortal');el.classList.add('hidden');el.innerHTML='';portalInput=null;portalResults=[];portalBaseResults=[];}
 function centerInViewport(el,{block='center'}={}){
   if(!el)return;
   const run=(smooth)=>{try{el.scrollIntoView({behavior:smooth?'smooth':'auto',block,inline:'nearest'});}catch{el.scrollIntoView();}};
@@ -200,8 +322,17 @@ function revealAddPanel(el){
   el.classList.remove('hidden');
   centerInViewport(el);
 }
-function chooseProduct(p){selectedProduct=p;$('selectedName').textContent=p.name;$('selectedMeta').textContent=`${fmt(p.kcal100)} kcal / 100 g${p.source?` · ${p.source}`:''}`;const storageNote=$('productStorageNote');if(p.source==='FatSecret'&&p.storageAllowed!==true){storageNote.textContent='Podgląd z FatSecret. Zapis do dziennika jest zablokowany, ponieważ standardowe warunki FatSecret nie pozwalają na trwałe przechowywanie wartości odżywczych. Użyj zapisanej bazy lub Open Food Facts.';storageNote.classList.remove('hidden');}else if(p.source==='FatSecret'){storageNote.textContent='Zgoda na trwały zapis FatSecret: potwierdzona w konfiguracji serwera. Dane zostaną zapisane zgodnie z zakresem Twojej umowy.';storageNote.classList.remove('hidden');}else if(p.sourceKind==='generic-reference'||p.sourceKind==='published-reference'||p.sourceKind==='retailer-official'||p.sourceKind==='retailer-assortment-reference'){storageNote.textContent=p.dataNote||'Wartość orientacyjna — sprawdź etykietę konkretnego opakowania.';storageNote.classList.remove('hidden');}else{storageNote.textContent='';storageNote.classList.add('hidden');}$('addToDiary').disabled=p.source==='FatSecret'&&p.storageAllowed!==true;$('addToDiary').innerHTML=$('addToDiary').disabled?`${ico('x')} Zapis wymaga zgody FatSecret`:`${ico('plus')} Dodaj do dziennika`;$('selectedPanel').classList.remove('hidden');$('grams').value='100';renderPortion();const shortcuts=[];if(p.unitWeight){shortcuts.push({label:`1 szt. ≈ ${fmt(p.unitWeight,0)} g`,g:p.unitWeight},{label:`½ szt. ≈ ${fmt(p.unitWeight/2,0)} g`,g:p.unitWeight/2});}if(p.id==='banana'||normalizeText(p.name).includes('banan'))shortcuts.unshift({label:'1 banan ≈ 120 g',g:120});$('unitShortcuts').innerHTML=shortcuts.map(x=>`<button type="button" data-grams="${x.g}">${x.label}</button>`).join('');closePortal();revealAddPanel($('selectedPanel'));focusAddField($('grams'));}
-function renderPortion(){if(!selectedProduct)return;const grams=Math.max(0,Number($('grams').value)||0);$('portionKcal').textContent=`${fmt(selectedProduct.kcal100*grams/100)} kcal`;}
+function chooseProduct(p){selectedProduct=p;$('selectedName').textContent=p.name;$('selectedMeta').textContent=`${fmt(p.kcal100)} kcal / 100 g${p.source?` · ${p.source}`:''}`;const storageNote=$('productStorageNote');if(p.source==='FatSecret'&&p.storageAllowed!==true){storageNote.textContent='Podgląd z FatSecret. Zapis do dziennika jest zablokowany, ponieważ standardowe warunki FatSecret nie pozwalają na trwałe przechowywanie wartości odżywczych. Użyj zapisanej bazy lub Open Food Facts.';storageNote.classList.remove('hidden');}else if(p.source==='FatSecret'){storageNote.textContent='Zgoda na trwały zapis FatSecret: potwierdzona w konfiguracji serwera. Dane zostaną zapisane zgodnie z zakresem Twojej umowy.';storageNote.classList.remove('hidden');}else if(p.sourceKind==='generic-reference'||p.sourceKind==='published-reference'||p.sourceKind==='retailer-official'||p.sourceKind==='retailer-assortment-reference'){storageNote.textContent=p.dataNote||'Wartość orientacyjna — sprawdź etykietę konkretnego opakowania.';storageNote.classList.remove('hidden');}else{storageNote.textContent='';storageNote.classList.add('hidden');}$('addToDiary').disabled=p.source==='FatSecret'&&p.storageAllowed!==true;$('addToDiary').innerHTML=$('addToDiary').disabled?`${ico('x')} Zapis wymaga zgody FatSecret`:`${ico('plus')} Dodaj do dziennika`;$('selectedPanel').classList.remove('hidden');$('grams').value=String(grossFromNet(100,'productVessel'));renderPortion();const shortcuts=[];if(p.unitWeight){shortcuts.push({label:`1 szt. ≈ ${fmt(p.unitWeight,0)} g`,g:p.unitWeight},{label:`½ szt. ≈ ${fmt(p.unitWeight/2,0)} g`,g:p.unitWeight/2});}if(p.id==='banana'||normalizeText(p.name).includes('banan'))shortcuts.unshift({label:'1 banan ≈ 120 g',g:120});$('unitShortcuts').innerHTML=shortcuts.map(x=>`<button type="button" data-grams="${x.g}">${x.label}</button>`).join('');closePortal();revealAddPanel($('selectedPanel'));focusAddField($('grams'));}
+function vesselById(id){const list=Array.isArray(state.vessels)?state.vessels:[];return list.find(v=>String(v.id)===String(id))||null;}
+function vesselsList(){return (Array.isArray(state.vessels)?state.vessels:[]).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pl'));}
+function vesselOptionsHtml(selected=''){return '<option value="">Bez naczynia</option>'+vesselsList().map(v=>`<option value="${escapeHTML(v.id)}" ${String(v.id)===String(selected)?'selected':''}>${escapeHTML(v.name)} · ${fmt(v.grams,1)} g</option>`).join('');}
+function refreshVesselSelects(){for(const id of ['productVessel','diaryRecipeVessel','diaryPlanVessel']){const el=$(id);if(!el)continue;const current=el.value;el.innerHTML=vesselOptionsHtml(current);el.value=current&&vesselById(current)?current:'';el.dataset.prevVessel=el.value;}renderPortion();renderDishPortion();renderPlanDaySummary();}
+function netGrams(inputId,vesselSelectId){const gross=nval($(inputId).value);if(gross===null)return null;const vessel=vesselById($(vesselSelectId).value);return round1(gross-(vessel?Number(vessel.grams):0));}
+function grossFromNet(net,vesselSelectId){const vessel=vesselById($(vesselSelectId).value);return round1(Number(net)+(vessel?Number(vessel.grams):0));}
+function vesselChange(gramsInputId,vesselSelectId){const select=$(vesselSelectId);const prev=vesselById(select.dataset.prevVessel||'');const next=vesselById(select.value);const input=$(gramsInputId);if(input.value!==''){const net=Number(input.value)-(prev?Number(prev.grams):0);const gross=net+(next?Number(next.grams):0);input.value=String(round1(Math.max(0.1,gross)));}select.dataset.prevVessel=select.value;}
+function productNetGrams(){return netGrams('grams','productVessel');}
+function productStorageBlocked(p){return p&&p.source==='FatSecret'&&p.storageAllowed!==true;}
+function renderPortion(){const vessel=vesselById($('productVessel').value);const net=productNetGrams();const valid=net!==null&&net>0&&net<=10000;$('gramsLabelText').textContent=vessel?'Waga z naczyniem (g)':'Gramatura (g)';$('portionKcal').textContent=selectedProduct&&valid?`${fmt(selectedProduct.kcal100*net/100)} kcal`:'— kcal';const note=$('productVesselNote');if(!vesselsList().length)note.textContent='Nie masz jeszcze naczyń. Dodaj je w zakładce „Naczynia”, aby odejmować ich wagę.';else if(!vessel)note.textContent='Bez naczynia — podaj wagę samego jedzenia.';else if(!valid)note.textContent=`Waga z naczyniem musi być większa niż ${fmt(vessel.grams,1)} g (ciężar naczynia).`;else note.textContent=`Naczynie „${vessel.name}” · ${fmt(vessel.grams,1)} g · jedzenie netto ${fmt(net,1)} g.`;note.classList.toggle('is-error',Boolean(vessel)&&!valid);$('addToDiary').disabled=productStorageBlocked(selectedProduct)||!valid;}
 async function performSearch(forceOnline=true){const q=$('productSearch').value.trim();if(q.length<2){$('searchStatus').textContent='Wpisz co najmniej 2 znaki.';closePortal();return;}const mode=$('catalogMode').value;const generation=++searchGeneration;
   if(mode==='saved'){
     $('searchStatus').textContent='Przeszukuję zapisaną bazę na tym urządzeniu…';openPortal($('productSearch'),[],'Przeszukuję zapisaną bazę…');
@@ -280,19 +411,19 @@ function renderCustomPlans(){
       const entries=assignments.map(a=>{
         const r=planRecipeById(a.recipeId);if(!r)return '';
         const servings=Math.max(.25,Number(a.servings)||1);
-        const kcal=(Number(r.totalKcal)||0)/Math.max(1,Number(r.portions)||1)*servings;total+=kcal;
+        const kcal=dishPerPortionKcal(r)*servings;total+=kcal;
         return `<div class="custom-plan-meal"><span class="meal-type-pill">${escapeHTML(a.meal||r.meal||'Posiłek')}</span><div><b>${escapeHTML(r.name)}</b><small>${fmt(servings,1)} porcji · ${fmt(kcal)} kcal</small></div></div>`;
       }).join('');
       return entries?`<div class="custom-plan-day"><div class="custom-day-date"><b>${weekdayName(date)}</b><small>${new Intl.DateTimeFormat('pl-PL',{day:'numeric',month:'short'}).format(new Date(`${date}T12:00:00`))}</small></div><div class="custom-day-meals">${entries}</div><strong class="custom-day-total">${fmt(total)} kcal</strong></div>`:'';
     }).filter(Boolean).join('');
-    const kcal=(plan.assignments||[]).reduce((sum,a)=>{const r=planRecipeById(a.recipeId);return sum+(r?(Number(r.totalKcal)||0)/Math.max(1,Number(r.portions)||1)*(Number(a.servings)||1):0);},0);
+    const kcal=(plan.assignments||[]).reduce((sum,a)=>{const r=planRecipeById(a.recipeId);return sum+(r?dishPerPortionKcal(r)*(Number(a.servings)||1):0);},0);
     const recipeCount=(plan.assignments||[]).length;
     return `<article class="custom-plan-card"><div class="custom-plan-header"><div><div class="custom-plan-tags"><span class="own-plan-tag">WŁASNY PLAN</span><span class="plan-date-range">${new Intl.DateTimeFormat('pl-PL',{day:'numeric',month:'short',year:'numeric'}).format(new Date(`${plan.startDate}T12:00:00`))} — ${new Intl.DateTimeFormat('pl-PL',{day:'numeric',month:'short',year:'numeric'}).format(new Date(`${end}T12:00:00`))}</span></div><h3>${escapeHTML(plan.title)}</h3><p>${recipeCount} zaplanowanych pozycji · ${fmt(kcal)} kcal łącznie w tygodniu</p></div><div class="custom-plan-actions"><button type="button" class="icon-button subtle-icon" data-edit-plan="${escapeHTML(plan.id)}" aria-label="Edytuj plan" title="Edytuj plan">${ico('pencil')}</button><button type="button" class="icon-delete" data-delete-plan="${escapeHTML(plan.id)}" aria-label="Usuń plan" title="Usuń plan">${ico('x')}</button></div></div><div class="custom-plan-days">${days||'<p class="muted">Ten plan nie ma jeszcze przypisanych dań.</p>'}</div><div class="custom-plan-footer"><span><b>${recipeCount}</b> posiłków · <b>${fmt(kcal)}</b> kcal / tydzień</span><span class="footer-hint">Dzień z tego planu dodasz w zakładce „Dziennik”.</span></div></article>`;
   }).join('');
 }
 function recipeOptions(selected=''){
   const recipes=allDishes();
-  return `<option value="">${recipes.length?'Wybierz danie':'Najpierw dodaj danie'}</option>`+recipes.map(r=>`<option value="${escapeHTML(r.id)}" ${r.id===selected?'selected':''}>${escapeHTML(r.name)} · ${fmt((Number(r.totalKcal)||0)/Math.max(1,Number(r.portions)||1))} kcal / porcję</option>`).join('');
+  return `<option value="">${recipes.length?'Wybierz danie':'Najpierw dodaj danie'}</option>`+recipes.map(r=>`<option value="${escapeHTML(r.id)}" ${r.id===selected?'selected':''}>${escapeHTML(r.name)} · ${fmt(dishPerPortionKcal(r))} kcal / porcję</option>`).join('');
 }
 function createPlanAssignmentRow(value={}){
   const row=document.createElement('div');row.className='plan-assignment-row';
@@ -311,7 +442,7 @@ function openPlanDialog(plan=null){
   if(!allDishes().length){$('planError').textContent='Najpierw dodaj co najmniej jedno danie w zakładce „Dania”.';}
   openDialog('planDialog');
 }
-function addCompositionToDiary(composition,amount,unit,date,meal,{silent=false,label=''}={}){
+function addCompositionToDiary(composition,amount,unit,date,meal,{silent=false,label='',share=null}={}){
   if(!composition||!(composition.totalGrams>0)){if(!silent)toast('Wybrana pozycja nie ma danych do przeliczenia.');return false;}
   const grams=unit==='grams'?Number(amount):Number(amount)*composition.portionGrams;
   if(!Number.isFinite(grams)||grams<=0||grams>10000){if(!silent)toast('Podaj ilość: 0,1–10 000 g lub 0,25–20 porcji.');return false;}
@@ -322,17 +453,18 @@ function addCompositionToDiary(composition,amount,unit,date,meal,{silent=false,l
     if(!(itemGrams>0))continue;
     added=addEntry({name:item.name,kcal100:item.kcal100,protein100:item.protein100,fat100:item.fat100,carbs100:item.carbs100,source:item.source||'Danie'},itemGrams,meal||item.meal,date,{silent:true})||added;
   }
+  if(added&&share)queueShare({kind:share.kind||'dish',id:share.id||'',name:share.name||label||'Pozycja',meal:meal||'',date,grams,composition});
   if(added&&!silent){save();render();toast(`${label?`Dodano ${label}`:'Dodano'} · ${fmt(compositionKcal(composition,grams))} kcal.`);}
   return added;
 }
 function addRecipeToDiary(recipe,servings,date,meal,{silent=false}={}){
   if(!recipe)return false;
-  return addCompositionToDiary(recipeComposition(recipe),Number(servings)||1,'servings',date,meal,{silent,label:`danie „${recipe.name}”`});
+  return addCompositionToDiary(recipeComposition(recipe),Number(servings)||1,'servings',date,meal,{silent,label:`danie „${recipe.name}”`,share:{kind:'dish',id:recipe.id,name:recipe.name}});
 }
 function addPlanDayToDiary(planId,dayIndex,{unit='servings',amount=1,meal='',silent=false}={}){
   const plan=(state.plans||[]).find(p=>p.id===planId);
   if(!plan)return false;
-  return addCompositionToDiary(planDayComposition(plan,dayIndex),amount,unit,$('entryDate').value,meal,{silent,label:`dzień planu „${plan.title}”`});
+  return addCompositionToDiary(planDayComposition(plan,dayIndex),amount,unit,$('entryDate').value,meal,{silent,label:`dzień planu „${plan.title}”`,share:{kind:'plan-day',id:plan.id,name:`${plan.title} · ${weekdayName(dayShift(plan.startDate,dayIndex))}`}});
 }
 function createIngredientRow(initial={}){
   const wrap=document.createElement('div');wrap.className='ingredient-row';
@@ -369,7 +501,7 @@ function dishMatches(d,q,meal,source){
 }
 function dishCard(d){
   const custom=!d.type;
-  const perPortion=custom?(Number(d.totalKcal)||0)/Math.max(1,Number(d.portions)||1):(Number(d.kcal)||0);
+  const over=dishOverrideValues(d);const favorite=isFavorite('dishes',d.id);const perPortion=dishPerPortionKcal(d);
   const label=custom?'Twoje danie':(d.category||'Baza dań');
   const icon=d.meal==='Śniadanie'?ico('sun'):d.meal==='Obiad'?ico('utensils'):d.meal==='Kolacja'?ico('moon'):ico('chef');
   const stats=custom
@@ -378,10 +510,12 @@ function dishCard(d){
   const details=custom
     ? `<details class="recipe-details"><summary>Składniki i przygotowanie</summary><ul>${(d.ingredients||[]).map(x=>`<li><span>${escapeHTML(x.name)} · ${fmt(x.grams)} g</span><b>${fmt(x.kcal??Number(x.grams)*Number(x.kcal100)/100)} kcal</b></li>`).join('')}</ul>${d.instructions?`<p>${escapeHTML(d.instructions).replace(/\n/g,'<br>')}</p>`:''}</details>`
     : `<details class="recipe-details"><summary>Opis i źródło</summary>${d.description?`<p>${escapeHTML(d.description)}</p>`:''}<p class="recipe-source">${d.sourceUrl?`<a href="${escapeHTML(d.sourceUrl)}" target="_blank" rel="noopener">${escapeHTML(d.source||'Źródło')}</a>`:escapeHTML(d.source||'')}</p>${d.dataNote?`<p class="recipe-data-note">${escapeHTML(d.dataNote)}</p>`:''}</details>`;
+  const favoriteButton=`<button type="button" class="icon-button subtle-icon fav-toggle${favorite?' active':''}" data-fav-dish="${escapeHTML(d.id)}" aria-pressed="${favorite}" aria-label="${favorite?'Usuń danie z ulubionych':'Dodaj danie do ulubionych'}" title="${favorite?'Usuń z ulubionych':'Dodaj do ulubionych'}">${ico('star')}</button>`;
+  const overrideButton=`<button type="button" class="icon-button subtle-icon" data-override-dish="${escapeHTML(d.id)}" aria-label="Nadpisz kalorie i składniki dania" title="Nadpisz wartości">${ico('settings')}</button>`;
   const actions=custom
-    ? `<button type="button" class="icon-button subtle-icon" data-edit-recipe="${escapeHTML(d.id)}" aria-label="Edytuj danie" title="Edytuj danie">${ico('pencil')}</button><button type="button" class="icon-delete" data-delete-recipe="${escapeHTML(d.id)}" aria-label="Usuń danie" title="Usuń danie">${ico('x')}</button>`
-    : `<button type="button" class="secondary" data-use-dish="${escapeHTML(d.id)}">${ico('plus')} Dodaj do dziennika</button>`;
-  return `<article class="recipe-card${custom?' custom-recipe':''}"><div class="recipe-card-top"><span class="recipe-emoji">${icon}</span><span class="recipe-meal-label">${escapeHTML(label)}</span></div><h3>${escapeHTML(d.name)}</h3>${d.description?`<p class="recipe-description">${escapeHTML(d.description)}</p>`:''}<div class="recipe-nutrition">${stats}</div>${details}<div class="recipe-card-actions${custom?' custom-actions':''}">${actions}</div></article>`;
+    ? `<button type="button" class="icon-button subtle-icon" data-edit-recipe="${escapeHTML(d.id)}" aria-label="Edytuj danie" title="Edytuj danie">${ico('pencil')}</button><button type="button" class="icon-delete" data-delete-recipe="${escapeHTML(d.id)}" aria-label="Usuń danie" title="Usuń danie">${ico('x')}</button>${favoriteButton}${overrideButton}`
+    : `<button type="button" class="secondary" data-use-dish="${escapeHTML(d.id)}">${ico('plus')} Dodaj do dziennika</button>${favoriteButton}${overrideButton}`;
+  return `<article class="recipe-card${custom?' custom-recipe':''}${favorite?' is-favorite':''}"><div class="recipe-card-top"><span class="recipe-emoji">${icon}</span><div class="recipe-badges"><span class="recipe-meal-label">${escapeHTML(label)}</span>${over?'<span class="override-flag">nadpisane</span>':''}</div></div><h3>${escapeHTML(d.name)}</h3>${d.description?`<p class="recipe-description">${escapeHTML(d.description)}</p>`:''}<div class="recipe-nutrition">${stats}</div>${details}<div class="recipe-card-actions${custom?' custom-actions':''}">${actions}</div></article>`;
 }
 function renderRecipes(){
   const all=allDishes();const q=normalizeText(dishesQuery||$('recipeSearch')?.value||'');const meal=$('recipeMealFilter')?.value||'all';const source=$('recipeSourceFilter')?.value||'all';
@@ -389,7 +523,7 @@ function renderRecipes(){
   const baseAll=catalogDishes;
   const visibleCustom=customAll.filter(d=>dishMatches(d,q,meal,source));
   const visibleBase=baseAll.filter(d=>dishMatches(d,q,meal,source));
-  const visibleBasePage=visibleBase.slice(0,dishesLimit);
+  const visibleBasePage=favoritesFirst(visibleBase,'dishes').slice(0,dishesLimit);
   $('recipeCount').textContent=fmt(all.length);
   $('recipeOwnCount').textContent=fmt(customAll.length);
   $('recipeIngredientsCount').textContent=fmt(baseAll.filter(d=>d.type==='fast-food').length);
@@ -397,14 +531,14 @@ function renderRecipes(){
   $('seedDishCount').textContent=`${fmt(baseAll.length)} DAŃ · TYLKO ODCZYT`;
   const customAllowed=source==='all'||source==='custom';
   $('customRecipesList').innerHTML=customAllowed
-    ? (visibleCustom.length?visibleCustom.map(dishCard).join(''):`<div class="recipe-empty"><div class="empty-symbol">${ico('chef')}</div><b>${customAll.length?'Nie znaleziono własnych dań':'Nie masz jeszcze własnych dań'}</b><p>${customAll.length?'Zmień frazę lub filtr posiłku.':'Dodaj własne danie — pojawi się tutaj i w bazie dań.'}</p><button type="button" class="primary" data-empty-create-recipe>${ico('plus')} Dodaj własne danie</button></div>`)
+    ? (visibleCustom.length?favoritesFirst(visibleCustom,'dishes').map(dishCard).join(''):`<div class="recipe-empty"><div class="empty-symbol">${ico('chef')}</div><b>${customAll.length?'Nie znaleziono własnych dań':'Nie masz jeszcze własnych dań'}</b><p>${customAll.length?'Zmień frazę lub filtr posiłku.':'Dodaj własne danie — pojawi się tutaj i w bazie dań.'}</p><button type="button" class="primary" data-empty-create-recipe>${ico('plus')} Dodaj własne danie</button></div>`)
     : `<div class="recipe-empty"><div class="empty-symbol">${ico('chef')}</div><b>Filtr pokazuje bazę dań</b><p>Wybierz „Wszystkie” lub „Twoje dania”, aby zobaczyć własne pozycje.</p></div>`;
   $('seedDishesList').innerHTML=visibleBasePage.length
     ? visibleBasePage.map(dishCard).join('')
     : `<div class="recipe-empty"><div class="empty-symbol">${ico('chef')}</div><b>Brak dań w bazie</b><p>Zmień frazę, posiłek lub źródło. Bazę dań można przeglądać bez dodawania własnych pozycji.</p></div>`;
   $('dishesStatus').textContent=q||meal!=='all'||source!=='all'
-    ? `Pokazano ${fmt(visibleBasePage.length)} z ${fmt(visibleBase.length)} pasujących dań w bazie${q?` dla „${(dishesQuery||'').trim()}”`:''}.`
-    : `Pokazano ${fmt(visibleBasePage.length)} z ${fmt(baseAll.length)} dań w bazie. Wyszukiwanie i filtry zawężają także Twoje dania.`;
+    ? `Pokazano ${fmt(visibleBasePage.length)} z ${fmt(visibleBase.length)} pasujących pozycji.`
+    : `Pokazano ${fmt(visibleBasePage.length)} z ${fmt(baseAll.length)} pozycji.`;
   $('loadMoreDishes').hidden=visibleBase.length<=dishesLimit;
 }
 
@@ -414,14 +548,18 @@ function renderRecipes(){
 // Dodawanie do dnia pozostaje wyłącznie w zakładce „Dziennik”.
 // ---------------------------------------------------------------------------
 function productCard(product,{custom=false}={}){
+  product=applyProductOverride(product);
+  const favorite=isFavorite('products',product.id);const overridden=Boolean(productOverride(product.id));
   const meta=[product.brand,product.store||'Katalog',productSourceLabel(product,custom)].filter(Boolean).join(' · ');
   const unit=product.unitWeight?`<span>1 szt. <b>${fmt(product.unitWeight,0)} g</b></span>`:'';
   const description=`<p class="product-description product-description--empty">Brak opisu</p>`;
+  const favoriteButton=`<button type="button" class="icon-button subtle-icon fav-toggle${favorite?' active':''}" data-fav-product="${escapeHTML(product.id)}" aria-pressed="${favorite}" aria-label="${favorite?'Usuń produkt z ulubionych':'Dodaj produkt do ulubionych'}" title="${favorite?'Usuń z ulubionych':'Dodaj do ulubionych'}">${ico('star')}</button>`;
+  const overrideButton=`<button type="button" class="icon-button subtle-icon" data-override-product="${escapeHTML(product.id)}" aria-label="Nadpisz kalorie i składniki produktu" title="Nadpisz wartości">${ico('settings')}</button>`;
   const buttons=custom
-    ? `<button type="button" class="secondary" data-use-product="${escapeHTML(product.id)}">${ico('plus')} Dodaj do dziennika</button><button type="button" class="icon-button subtle-icon" data-edit-product="${escapeHTML(product.id)}" aria-label="Edytuj produkt" title="Edytuj produkt">${ico('pencil')}</button><button type="button" class="icon-delete" data-delete-product="${escapeHTML(product.id)}" aria-label="Usuń produkt" title="Usuń produkt">${ico('x')}</button>`
-    : `<button type="button" class="secondary" data-use-product="${escapeHTML(product.id)}">${ico('plus')} Dodaj do dziennika</button>`;
-  return `<article class="product-card${custom?' custom-product':''}">
-    <div class="product-card-head"><span class="product-emoji" aria-hidden="true">${categoryIcon(product)}</span><div class="product-identity"><b>${escapeHTML(product.name)}</b><small>${escapeHTML(meta)}</small></div><span class="product-kcal">${fmt(product.kcal100)}<small>kcal</small></span></div>
+    ? `<button type="button" class="secondary" data-use-product="${escapeHTML(product.id)}">${ico('plus')} Dodaj do dziennika</button><button type="button" class="icon-button subtle-icon" data-edit-product="${escapeHTML(product.id)}" aria-label="Edytuj produkt" title="Edytuj produkt">${ico('pencil')}</button><button type="button" class="icon-delete" data-delete-product="${escapeHTML(product.id)}" aria-label="Usuń produkt" title="Usuń produkt">${ico('x')}</button>${favoriteButton}${overrideButton}`
+    : `<button type="button" class="secondary" data-use-product="${escapeHTML(product.id)}">${ico('plus')} Dodaj do dziennika</button>${favoriteButton}${overrideButton}`;
+  return `<article class="product-card${custom?' custom-product':''}${favorite?' is-favorite':''}">
+    <div class="product-card-head"><span class="product-emoji" aria-hidden="true">${categoryIcon(product)}</span><div class="product-identity"><b>${escapeHTML(product.name)}</b><small>${escapeHTML(meta)}</small>${overridden?'<small class="override-flag">wartości nadpisane</small>':''}</div><span class="product-kcal">${fmt(product.kcal100)}<small>kcal</small></span></div>
     ${description}
     <div class="product-macros"><span>Białko <b>${fmt(product.protein100,1)} g</b></span><span>Tłuszcz <b>${fmt(product.fat100,1)} g</b></span><span>Węgl. <b>${fmt(product.carbs100,1)} g</b></span>${unit}</div>
     <div class="product-card-actions">${buttons}</div>
@@ -440,15 +578,15 @@ function productMatches(p,q){
 function renderProductsView(){
   const list=$('seedProductsList');
   if(!list)return;
-  const custom=Array.isArray(state.customProducts)?state.customProducts:[];
+  const custom=applyProductList(Array.isArray(state.customProducts)?state.customProducts:[]);
   const customIds=new Set(custom.map(p=>p.id));
   const q=normalizeText(productsQuery||'');
   const source=$('productStoreFilter')?.value||productsStore||'all';
   productsStore=source;
   let filtered;
-  if(source==='custom')filtered=custom.filter(p=>productMatches(p,q));
-  else if(source==='all')filtered=[...custom.filter(p=>productMatches(p,q)),...catalogProducts.filter(p=>productMatches(p,q))];
-  else filtered=catalogProducts.filter(p=>p.store===source&&productMatches(p,q));
+  if(source==='custom')filtered=favoritesFirst(custom.filter(p=>productMatches(p,q)),'products');
+  else if(source==='all')filtered=favoritesFirst([...custom.filter(p=>productMatches(p,q)),...applyProductList(catalogProducts).filter(p=>productMatches(p,q))],'products');
+  else filtered=favoritesFirst(applyProductList(catalogProducts).filter(p=>p.store===source&&productMatches(p,q)),'products');
   const visible=filtered.slice(0,productsLimit);
   $('productTotalCount').textContent=fmt(catalogProducts.length+custom.length);
   $('productOwnCount').textContent=fmt(custom.length);
@@ -461,8 +599,8 @@ function renderProductsView(){
       : `<div class="product-empty"><b>Brak wyników</b><p>Zmień frazę lub źródło. Możesz też dodać własny produkt.</p></div>`;
   const context=[q?`„${(productsQuery||'').trim()}”`:'',source==='custom'?'źródło: Twoje produkty':source!=='all'?`sklep: ${source}`:''].filter(Boolean).join(' · ');
   $('productsStatus').textContent=context
-    ? `Pokazano ${fmt(visible.length)} z ${fmt(filtered.length)} pasujących pozycji (${context}).`
-    : `Pokazano ${fmt(visible.length)} z ${fmt(filtered.length)} pozycji (katalog + własne).`;
+    ? `Pokazano ${fmt(visible.length)} z ${fmt(filtered.length)} pasujących pozycji.`
+    : `Pokazano ${fmt(visible.length)} z ${fmt(filtered.length)} pozycji.`;
   $('loadMoreProducts').hidden=filtered.length<=productsLimit;
 }
 
@@ -480,10 +618,9 @@ function useDishInDiary(id){
   const dish=getDishById(id);
   if(!dish)return;
   showView('diary');
+  $('diaryRecipeSearch').value='';
   setAddMode('recipe');
-  $('diaryRecipe').value=dish.id;
-  $('diaryRecipeMeal').value=dish.meal||'Obiad';
-  resetDishQuantity();
+  chooseDiaryRecipe(dish);
   focusAddField($('diaryRecipeServings'));
 }
 // Tryby w karcie „Dodaj produkt/danie/dzień”.
@@ -499,22 +636,69 @@ function setAddMode(mode){
   if(mode==='recipe')fillDiaryRecipeOptions();
   if(mode==='plan-day')fillDiaryPlanOptions();
 }
-function fillDiaryRecipeOptions(){
-  const recipes=allDishes();
-  const current=$('diaryRecipe').value;
-  $('diaryRecipe').innerHTML=recipes.length
-    ? recipes.map(r=>`<option value="${escapeHTML(r.id)}">${escapeHTML(r.name)} · ${fmt((Number(r.totalKcal)||0)/Math.max(1,Number(r.portions)||1))} kcal / porcję</option>`).join('')
-    : '<option value="">Najpierw dodaj danie w zakładce „Dania”</option>';
-  if(current&&recipes.some(r=>r.id===current))$('diaryRecipe').value=current;
-  $('addRecipeToDiary').disabled=!recipes.length;
+function syncDiaryClear(inputId,buttonId){const input=$(inputId);const button=$(buttonId);if(input&&button)button.classList.toggle('hidden',!input.value);}
+// „Danie” i „Własny plan”: pole wyszukiwania z listą wyników zamiast selecta.
+let diaryRecipeList=[],diaryRecipeResults=[],diaryPlanList=[],diaryPlanResults=[];
+function diaryMatches(query,items,text){return query?items.filter(item=>normalizeText(text(item)).includes(query)):items;}
+function drawDiaryRecipeResults(open=false){
+  const input=$('diaryRecipeSearch'),box=$('diaryRecipeResults');
+  const matches=favoritesFirst(diaryMatches(normalizeText(input.value),diaryRecipeList,r=>`${r.name||''} ${r.meal||''} ${r.category||''}`),'dishes');
+  diaryRecipeResults=matches.slice(0,40);
+  const selected=$('diaryRecipe').value;
+  box.innerHTML=matches.length
+    ? diaryRecipeResults.map((r,i)=>`<button type="button" class="combo-option${r.id===selected?' active':''}" role="option" aria-selected="${r.id===selected}" data-recipe-index="${i}"><span class="combo-option-copy"><b>${escapeHTML(r.name)}</b><small>${escapeHTML([r.meal,r.type==='fast-food'?r.category:'Baza dań'].filter(Boolean).join(' · '))}</small></span><span class="combo-kcal">${fmt(dishPerPortionKcal(r))} kcal</span></button>`).join('')
+    : `<div class="portal-message">${diaryRecipeList.length?'Brak dań pasujących do wyszukiwania.':'Najpierw dodaj danie w zakładce „Dania”.'}</div>`;
+  box.classList.toggle('hidden',!open);
+  input.setAttribute('aria-expanded',String(open));
+}
+function chooseDiaryRecipe(recipe){
+  if(!recipe)return;
+  $('diaryRecipe').value=recipe.id;
+  $('diaryRecipeSearch').value=recipe.name;
+  syncDiaryClear('diaryRecipeSearch','clearDiaryRecipeSearch');
+  $('diaryRecipeMeal').value=recipe.meal||$('diaryRecipeMeal').value;
+  drawDiaryRecipeResults(false);
   resetDishQuantity();
 }
+function fillDiaryRecipeOptions(){
+  diaryRecipeList=allDishes();
+  const select=$('diaryRecipe'),current=select.value;
+  select.innerHTML=['<option value="">Wybierz danie</option>',...diaryRecipeList.map(r=>`<option value="${escapeHTML(r.id)}">${escapeHTML(r.name)} · ${fmt(dishPerPortionKcal(r))} kcal / porcję</option>`)].join('');
+  select.value=current&&diaryRecipeList.some(r=>r.id===current)?current:'';
+  const chosen=diaryRecipeList.find(r=>r.id===select.value);
+  if(chosen)$('diaryRecipeSearch').value=chosen.name;
+  syncDiaryClear('diaryRecipeSearch','clearDiaryRecipeSearch');
+  drawDiaryRecipeResults(false);
+  resetDishQuantity();
+}
+function drawDiaryPlanResults(open=false){
+  const input=$('diaryPlanSearch'),box=$('diaryPlanResults');
+  const matches=diaryMatches(normalizeText(input.value),diaryPlanList,p=>p.title||'');
+  diaryPlanResults=matches.slice(0,40);
+  const selected=$('diaryPlan').value;
+  box.innerHTML=matches.length
+    ? diaryPlanResults.map((p,i)=>`<button type="button" class="combo-option${p.id===selected?' active':''}" role="option" aria-selected="${p.id===selected}" data-plan-index="${i}"><span class="combo-option-copy"><b>${escapeHTML(p.title)}</b><small>${(p.assignments||[]).length} ${(p.assignments||[]).length===1?'pozycja':'pozycji'} w planie</small></span></button>`).join('')
+    : `<div class="portal-message">${diaryPlanList.length?'Brak planów pasujących do wyszukiwania.':'Najpierw utwórz plan w „Planie tygodnia”.'}</div>`;
+  box.classList.toggle('hidden',!open);
+  input.setAttribute('aria-expanded',String(open));
+}
+function chooseDiaryPlan(plan){
+  if(!plan)return;
+  $('diaryPlan').value=plan.id;
+  $('diaryPlanSearch').value=plan.title;
+  syncDiaryClear('diaryPlanSearch','clearDiaryPlanSearch');
+  drawDiaryPlanResults(false);
+  fillDiaryPlanDays();
+}
 function fillDiaryPlanOptions(){
-  const plans=Array.isArray(state.plans)?state.plans:[];
-  $('diaryPlan').innerHTML=plans.length
-    ? plans.map(p=>`<option value="${escapeHTML(p.id)}">${escapeHTML(p.title)}</option>`).join('')
-    : '<option value="">Najpierw utwórz plan w „Planie tygodnia”</option>';
-  $('addPlanDayToDiary').disabled=!plans.length;
+  diaryPlanList=Array.isArray(state.plans)?state.plans:[];
+  const select=$('diaryPlan'),current=select.value;
+  select.innerHTML=['<option value="">Wybierz plan</option>',...diaryPlanList.map(p=>`<option value="${escapeHTML(p.id)}">${escapeHTML(p.title)}</option>`)].join('');
+  select.value=current&&diaryPlanList.some(p=>p.id===current)?current:'';
+  const chosen=diaryPlanList.find(p=>p.id===select.value);
+  if(chosen)$('diaryPlanSearch').value=chosen.title;
+  syncDiaryClear('diaryPlanSearch','clearDiaryPlanSearch');
+  drawDiaryPlanResults(false);
   fillDiaryPlanDays();
 }
 function fillDiaryPlanDays(){
@@ -552,6 +736,17 @@ function recipeComposition(recipe){
   }).filter(item=>item.grams>0&&Number.isFinite(item.kcal100));
   const totalGrams=items.reduce((sum,item)=>sum+item.grams,0);
   const totalKcal=items.reduce((sum,item)=>sum+item.grams*item.kcal100/100,0);
+  const over=dishOverrideValues(recipe);
+  if(over){
+    const macro=(key)=>items.reduce((sum,item)=>sum+(numOrNull(item[key])!==null?item.grams*numOrNull(item[key])/100:0),0);
+    const base={kcal:totalKcal,protein:macro('protein100'),fat:macro('fat100'),carbs:macro('carbs100')};
+    const factor=(target,baseValue)=>target!==undefined&&baseValue>0?target*portions/baseValue:1;
+    const fk=factor(over.kcal,base.kcal),fp=factor(over.protein,base.protein),ff=factor(over.fat,base.fat),fc=factor(over.carbs,base.carbs);
+    const scaled=items.map(item=>({...item,kcal100:item.kcal100*fk,protein100:numOrNull(item.protein100)!==null?Number(item.protein100)*fp:null,fat100:numOrNull(item.fat100)!==null?Number(item.fat100)*ff:null,carbs100:numOrNull(item.carbs100)!==null?Number(item.carbs100)*fc:null}));
+    const scaledGrams=scaled.reduce((sum,item)=>sum+item.grams,0);
+    const scaledKcal=scaled.reduce((sum,item)=>sum+item.grams*item.kcal100/100,0);
+    return {items:scaled,totalGrams:scaledGrams,totalKcal:scaledKcal,portionGrams:scaledGrams/portions,portions};
+  }
   return {items,totalGrams,totalKcal,portionGrams:totalGrams/portions,portions};
 }
 function planDayComposition(plan,dayIndex){
@@ -589,9 +784,9 @@ function syncDishUnit(){
   const composition=selectedDishComposition();
   if(!composition||!(composition.portionGrams>0))return;
   if($('diaryRecipeUnit').value==='grams'){
-    $('diaryRecipeGrams').value=String(round1((Number($('diaryRecipeServings').value)||1)*composition.portionGrams));
+    $('diaryRecipeGrams').value=String(grossFromNet(round1((Number($('diaryRecipeServings').value)||1)*composition.portionGrams),'diaryRecipeVessel'));
   }else{
-    const grams=Number($('diaryRecipeGrams').value)||composition.portionGrams;
+    const vessel=vesselById($('diaryRecipeVessel').value);const grams=Math.max(0.1,(Number($('diaryRecipeGrams').value)||round1(composition.portionGrams+(vessel?Number(vessel.grams):0)))-(vessel?Number(vessel.grams):0));
     $('diaryRecipeServings').value=String(Math.max(.25,Math.min(20,Math.round(grams/composition.portionGrams*4)/4))||1);
   }
   toggleDishUnitFields();
@@ -600,23 +795,29 @@ function resetDishQuantity(){
   const composition=selectedDishComposition();
   $('diaryRecipeUnit').value='servings';
   $('diaryRecipeServings').value='1';
-  $('diaryRecipeGrams').value=composition&&composition.portionGrams>0?String(round1(composition.portionGrams)):'';
+  $('diaryRecipeGrams').value=composition&&composition.portionGrams>0?String(grossFromNet(round1(composition.portionGrams),'diaryRecipeVessel')):'';
   toggleDishUnitFields();
   renderDishPortion();
 }
 function renderDishPortion(){
   const composition=selectedDishComposition();
-  const unit=$('diaryRecipeUnit').value;
-  const amount=unit==='grams'?Number($('diaryRecipeGrams').value):Number($('diaryRecipeServings').value);
-  const grams=unit==='grams'?amount:amount*(composition?.portionGrams||0);
-  $('diaryRecipeKcal').textContent=composition&&grams>0?`${fmt(compositionKcal(composition,grams))} kcal`:'— kcal';
+  const unit=$('diaryRecipeUnit').value;const gramsMode=unit==='grams';const vessel=vesselById($('diaryRecipeVessel').value);$('diaryRecipeVessel').disabled=!gramsMode;$('diaryRecipeGramsLabel').textContent=vessel?'Waga z naczyniem (g)':'Gramatura (g)';
+  const gross=gramsMode?nval($('diaryRecipeGrams').value):null;const amount=gramsMode?gross:(Number($('diaryRecipeServings').value)||0);
+  const grams=gramsMode?(gross===null?null:round1(gross-(vessel?Number(vessel.grams):0))):amount*(composition?.portionGrams||0);const valid=composition&&Number.isFinite(grams)&&grams>0&&grams<=10000;
+  $('diaryRecipeKcal').textContent=valid?`${fmt(compositionKcal(composition,grams))} kcal`:'— kcal';
   $('diaryRecipeMeta').textContent=composition
     ? `1 porcja ≈ ${fmt(composition.portionGrams,1)} g · całe danie ${fmt(composition.totalGrams,1)} g (${fmt(composition.portions)} ${composition.portions===1?'porcja':'porcji'}).`
     : 'Wybierz danie, aby zobaczyć przeliczenie.';
   $('diaryRecipeShortcuts').innerHTML=composition
     ? `<button type="button" data-dish-grams="${round1(composition.portionGrams)}">1 porcja ≈ ${fmt(composition.portionGrams)} g</button><button type="button" data-dish-grams="${round1(composition.portionGrams/2)}">½ porcji ≈ ${fmt(composition.portionGrams/2)} g</button>`
     : '';
-  $('addRecipeToDiary').disabled=!composition||!(grams>0);
+  const vesselNote=$('diaryRecipeVesselNote');
+  if(!gramsMode)vesselNote.textContent=vesselsList().length?'Przy liczbie porcji naczynie nie jest potrzebne. Wybierz „Gramatura (g)”, aby odjąć wagę naczynia.':'Nie masz jeszcze naczyń — dodaj je w zakładce „Naczynia”.';
+  else if(!vessel)vesselNote.textContent=vesselsList().length?'Bez naczynia — podaj wagę samego dania.':'Nie masz jeszcze naczyń — dodaj je w zakładce „Naczynia”.';
+  else if(!valid)vesselNote.textContent=`Waga z naczyniem musi być większa niż ${fmt(vessel.grams,1)} g (ciężar naczynia).`;
+  else vesselNote.textContent=`Naczynie „${vessel.name}” · ${fmt(vessel.grams,1)} g · danie netto ${fmt(grams,1)} g.`;
+  vesselNote.classList.toggle('is-error',gramsMode&&Boolean(vessel)&&!valid);
+  $('addRecipeToDiary').disabled=!valid;
 }
 function togglePlanUnitFields(){
   const gramsMode=$('diaryPlanUnit').value==='grams';
@@ -627,9 +828,9 @@ function syncPlanUnit(){
   const composition=selectedPlanDayComposition();
   if(!composition||!(composition.totalGrams>0))return;
   if($('diaryPlanUnit').value==='grams'){
-    $('diaryPlanGrams').value=String(round1((Number($('diaryPlanServings').value)||1)*composition.totalGrams));
+    $('diaryPlanGrams').value=String(grossFromNet(round1((Number($('diaryPlanServings').value)||1)*composition.totalGrams),'diaryPlanVessel'));
   }else{
-    const grams=Number($('diaryPlanGrams').value)||composition.totalGrams;
+    const vessel=vesselById($('diaryPlanVessel').value);const grams=Math.max(0.1,(Number($('diaryPlanGrams').value)||round1(composition.totalGrams+(vessel?Number(vessel.grams):0)))-(vessel?Number(vessel.grams):0));
     $('diaryPlanServings').value=String(Math.max(.25,Math.min(20,Math.round(grams/composition.totalGrams*4)/4))||1);
   }
   togglePlanUnitFields();
@@ -638,7 +839,7 @@ function resetPlanQuantity(){
   const composition=selectedPlanDayComposition();
   $('diaryPlanUnit').value='servings';
   $('diaryPlanServings').value='1';
-  $('diaryPlanGrams').value=composition&&composition.totalGrams>0?String(round1(composition.totalGrams)):'';
+  $('diaryPlanGrams').value=composition&&composition.totalGrams>0?String(grossFromNet(round1(composition.totalGrams),'diaryPlanVessel')):'';
   togglePlanUnitFields();
   renderPlanDaySummary();
 }
@@ -647,26 +848,124 @@ function renderPlanDaySummary(){
   const plan=(state.plans||[]).find(p=>p.id===$('diaryPlan').value);
   const dayIndex=Number($('diaryPlanDay').value);
   const count=(plan?.assignments||[]).filter(a=>Number(a.dayIndex)===dayIndex).length;
-  const unit=$('diaryPlanUnit').value;
-  const amount=unit==='grams'?Number($('diaryPlanGrams').value):Number($('diaryPlanServings').value);
-  const grams=unit==='grams'?amount:amount*(composition?.totalGrams||0);
-  $('diaryPlanKcal').textContent=composition&&grams>0?`${fmt(compositionKcal(composition,grams))} kcal`:'— kcal';
-  $('diaryPlanSummary').textContent=composition&&composition.totalGrams>0
-    ? `${count} ${count===1?'posiłek':'posiłków'} · cały dzień ${fmt(composition.totalGrams,1)} g · zostanie dodany do dnia ${$('entryDate').value}.`
+  const unit=$('diaryPlanUnit').value;const gramsMode=unit==='grams';const vessel=vesselById($('diaryPlanVessel').value);$('diaryPlanVessel').disabled=!gramsMode;$('diaryPlanGramsLabel').textContent=vessel?'Waga z naczyniem (g)':'Gramatura (g)';
+  const gross=gramsMode?nval($('diaryPlanGrams').value):null;const amount=gramsMode?gross:(Number($('diaryPlanServings').value)||0);
+  const grams=gramsMode?(gross===null?null:round1(gross-(vessel?Number(vessel.grams):0))):amount*(composition?.totalGrams||0);const valid=composition&&composition.totalGrams>0&&Number.isFinite(grams)&&grams>0&&grams<=10000;
+  $('diaryPlanKcal').textContent=valid?`${fmt(compositionKcal(composition,grams))} kcal`:'— kcal';
+  $('diaryPlanSummary').textContent=valid
+    ? `${count} ${count===1?'posiłek':'posiłków'} · cały dzień ${fmt(composition.totalGrams,1)} g${vessel&&gramsMode?` · netto ${fmt(grams,1)} g`:''} · zostanie dodany do dnia ${$('entryDate').value}.`
     : 'Wybierz plan i dzień z przypisanymi daniami.';
   $('diaryPlanShortcuts').innerHTML=composition&&composition.totalGrams>0
     ? `<button type="button" data-plan-grams="${round1(composition.totalGrams)}">1 porcja ≈ ${fmt(composition.totalGrams)} g</button><button type="button" data-plan-grams="${round1(composition.totalGrams/2)}">½ porcji ≈ ${fmt(composition.totalGrams/2)} g</button>`
     : '';
-  $('addPlanDayToDiary').disabled=!composition||!(composition.totalGrams>0)||!(grams>0);
+  const vesselNote=$('diaryPlanVesselNote');
+  if(!gramsMode)vesselNote.textContent=vesselsList().length?'Przy liczbie porcji naczynie nie jest potrzebne. Wybierz „Gramatura (g)”, aby odjąć wagę naczynia.':'Nie masz jeszcze naczyń — dodaj je w zakładce „Naczynia”.';
+  else if(!vessel)vesselNote.textContent=vesselsList().length?'Bez naczynia — podaj wagę całego dnia.':'Nie masz jeszcze naczyń — dodaj je w zakładce „Naczynia”.';
+  else if(!valid)vesselNote.textContent=`Waga z naczyniem musi być większa niż ${fmt(vessel.grams,1)} g (ciężar naczynia).`;
+  else vesselNote.textContent=`Naczynie „${vessel.name}” · ${fmt(vessel.grams,1)} g · dzień netto ${fmt(grams,1)} g.`;
+  vesselNote.classList.toggle('is-error',gramsMode&&Boolean(vessel)&&!valid);
+  $('addPlanDayToDiary').disabled=!valid;
 }
-function showView(view){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('hidden',v.id!==`${view}View`));if(view==='week')renderWeekly();if(view==='recipes')renderRecipes();if(view==='products')renderProductsView();}
+function showView(view){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('hidden',v.id!==`${view}View`));if(view==='week')renderWeekly();if(view==='recipes')renderRecipes();if(view==='products')renderProductsView();if(view==='vessels')renderVesselsView();}
 function downloadFile(name,content,type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function backupData(){downloadFile(`dziennik-zywieniowy-${today()}.json`,JSON.stringify(state,null,2),'application/json');}
 function openDialog(id){$(id).showModal();}
 function closeDialog(id){$(id).close();}
 
+// ---------------------------------------------------------------------------
+// Naczynia: waga pustego talerza/miski odejmowana od ważenia w dzienniku.
+// CRUD zapisuje się w koncie (Firestore, dokument shared) razem z produktami i planami.
+// ---------------------------------------------------------------------------
+let vesselsQuery='';let vesselsSort='name';let editingVesselId=null;
+function vesselCard(v){
+  return `<article class="vessel-card"><div class="vessel-card-head"><span class="vessel-emoji" aria-hidden="true">${ico('vessel')}</span><div class="vessel-identity"><b>${escapeHTML(v.name)}</b><small>Waga pustego naczynia</small></div><span class="vessel-weight">${fmt(v.grams,1)}<small>g</small></span></div><div class="vessel-card-actions"><button type="button" class="icon-button subtle-icon" data-edit-vessel="${escapeHTML(v.id)}" aria-label="Edytuj naczynie ${escapeHTML(v.name)}" title="Edytuj naczynie">${ico('pencil')}</button><button type="button" class="icon-delete" data-delete-vessel="${escapeHTML(v.id)}" aria-label="Usuń naczynie ${escapeHTML(v.name)}" title="Usuń naczynie">${ico('x')}</button></div></article>`;
+}
+function renderVesselsView(){
+  const list=$('vesselsList');if(!list)return;
+  const all=Array.isArray(state.vessels)?state.vessels:[];
+  const q=normalizeText(vesselsQuery||'');
+  const filtered=all.filter(v=>!q||normalizeText(`${v.name||''} ${v.grams||''}`).includes(q));
+  const sorted=[...filtered].sort((a,b)=>vesselsSort==='light'?Number(a.grams)-Number(b.grams):vesselsSort==='heavy'?Number(b.grams)-Number(a.grams):vesselsSort==='newest'?String(b.createdAt||'').localeCompare(String(a.createdAt||'')):String(a.name||'').localeCompare(String(b.name||''),'pl'));
+  $('vesselTotalCount').textContent=fmt(all.length);
+  const weights=all.map(v=>Number(v.grams)||0).filter(v=>v>0);
+  $('vesselLightest').textContent=weights.length?`${fmt(Math.min(...weights),1)} g`:'—';
+  $('vesselHeaviest').textContent=weights.length?`${fmt(Math.max(...weights),1)} g`:'—';
+  $('vesselCountLabel').textContent=`${all.length} ${all.length===1?'naczynie':all.length>1&&all.length<5?'naczynia':'naczyń'}`;
+  $('vesselsStatus').textContent=q?`Pokazano ${fmt(sorted.length)} z ${fmt(all.length)} naczyń.`:all.length?`${fmt(all.length)} ${all.length===1?'naczynie':'naczyń'} zapisanych na Twoim koncie.`:'Dodaj pierwsze naczynie, aby odjąć jego wagę w dzienniku.';
+  list.innerHTML=sorted.length?sorted.map(vesselCard).join(''):`<div class="vessel-empty"><div class="empty-symbol">${ico('vessel')}</div><b>${all.length?'Nie znaleziono naczynia':'Nie masz jeszcze naczyń'}</b><p>${all.length?'Zmień frazę lub wyczyść wyszukiwanie.':'Zapisz talerz, miskę albo pojemnik — wystarczy nazwa i waga pustego naczynia.'}</p>${all.length?'':`<button type="button" class="primary" data-empty-create-vessel>${ico('plus')} Dodaj pierwsze naczynie</button>`}</div>`;
+}
+function openVesselDialog(vessel=null){
+  editingVesselId=vessel?.id||null;const form=$('vesselForm');form.reset();$('vesselError').textContent='';
+  $('vesselDialogTitle').textContent=vessel?'Edytuj naczynie':'Nowe naczynie';
+  $('vesselSubmit').innerHTML=vessel?`${ico('check')} Zapisz zmiany`:`${ico('check')} Zapisz naczynie`;
+  if(vessel){form.elements.name.value=vessel.name||'';form.elements.grams.value=vessel.grams??'';}
+  $('vesselDialog').showModal();
+}
+function handleVesselAction(event){
+  if(event.target.closest('[data-empty-create-vessel]')){openVesselDialog();return;}
+  const edit=event.target.closest('[data-edit-vessel]');
+  if(edit){const v=(state.vessels||[]).find(x=>x.id===edit.dataset.editVessel);if(v)openVesselDialog(v);return;}
+  const del=event.target.closest('[data-delete-vessel]');
+  if(del){const v=(state.vessels||[]).find(x=>x.id===del.dataset.deleteVessel);if(!v)return;if(confirm(`Usunąć naczynie „${v.name}”? Zapisane wpisy w dzienniku pozostaną bez zmian.`)){state.vessels=(state.vessels||[]).filter(x=>x.id!==v.id);save();renderVesselsView();refreshVesselSelects();toast('Usunięto naczynie.');}}
+}
+
 // Events
-$('entryDate').value=today();$('weekStart').value=today();
+// ---------------------------------------------------------------------------
+// Ulubione, nadpisywanie wartości oraz kopiowanie posiłków między profilami.
+// ---------------------------------------------------------------------------
+let shareDraft=[];let overrideTarget=null;
+const profileLabel=(id)=>id==='female'?'Kobieta':'Mężczyzna';
+function formatDay(iso){if(!iso)return '—';try{return new Intl.DateTimeFormat('pl-PL',{day:'numeric',month:'long',year:'numeric'}).format(new Date(`${iso}T12:00:00`));}catch{return iso;}}
+function maybeOfferShare(){
+  const pending=state.pendingShare;
+  if(!pending||pending.from===activeProfile()||!Array.isArray(pending.items)||!pending.items.length)return;
+  openShareDialog();
+}
+function openShareDialog(){
+  const pending=state.pendingShare;if(!pending||!Array.isArray(pending.items)||!pending.items.length)return;
+  shareDraft=pending.items.filter(item=>item&&item.composition&&Number(item.composition.totalGrams)>0).map(item=>({...item}));
+  if(!shareDraft.length){state.pendingShare=null;save();return;}
+  $('shareIntro').textContent=`W zakładce „${profileLabel(pending.from)}” dodano pozycje do dziennika. Możesz je skopiować do zakładki „${profileLabel(activeProfile())}” — z własną gramaturą każdej pozycji.`;
+  const dates=[...new Set(shareDraft.map(item=>item.date))];
+  $('shareDate').textContent=dates.length===1?`Dzień: ${formatDay(dates[0])}`:`Dni: ${dates.map(formatDay).join(' · ')}`;
+  $('shareError').textContent='';
+  renderShareItems();
+  $('shareDialog').showModal();
+}
+function renderShareItems(){
+  $('shareItems').innerHTML=shareDraft.map((item,index)=>`<div class="share-item"><div class="share-item-copy"><b>${escapeHTML(item.name)}</b><small>${escapeHTML(item.meal||'Posiłek')} · ${escapeHTML(formatDay(item.date))}</small></div><label class="share-grams">Gramatura (g)<input type="number" data-share-grams="${index}" min="0.1" max="10000" step="0.1" value="${round1(item.grams)}" inputmode="decimal"></label><span class="share-kcal" data-share-kcal="${index}">${fmt(compositionKcal(item.composition,item.grams))} kcal</span></div>`).join('');
+}
+function skipShare(){closeDialog('shareDialog');toast('Pominięto kopiowanie posiłków.');}
+function openOverrideDialog(kind,id){
+  const key=String(id);
+  const base=kind==='product'?[...catalogProducts,...(state.customProducts||[])].find(p=>p.id===key):getDishById(key);
+  if(!base)return;
+  const isProduct=kind==='product';
+  const over=isProduct?productOverride(key):dishOverride(key);
+  const effective=isProduct?applyProductOverride(base):base;
+  const baseKcal=isProduct?numOrNull(effective.kcal100):(!effective.type?(numOrNull(effective.kcal)??((Number(effective.totalKcal)||0)/Math.max(1,Number(effective.portions)||1))):numOrNull(effective.kcal));
+  const values={
+    kcal:numOrNull(over?.kcal??over?.kcal100)??baseKcal,
+    protein:numOrNull(over?.protein??over?.protein100)??(isProduct?numOrNull(effective.protein100):numOrNull(effective.protein)),
+    fat:numOrNull(over?.fat??over?.fat100)??(isProduct?numOrNull(effective.fat100):numOrNull(effective.fat)),
+    carbs:numOrNull(over?.carbs??over?.carbs100)??(isProduct?numOrNull(effective.carbs100):numOrNull(effective.carbs))
+  };
+  overrideTarget={kind,id:key};
+  $('overrideTitle').textContent=`Nadpisz: ${base.name}`;
+  $('overrideIntro').textContent=isProduct?'Wartości na 100 g. Nadpisanie ma pierwszeństwo przed bazą i zapisuje się na Twoim koncie.':'Wartości na jedną porcję. Nadpisanie ma pierwszeństwo przed bazą i zapisuje się na Twoim koncie.';
+  $('overrideKcalLabel').firstChild.textContent=isProduct?'Kcal / 100 g':'Kcal / porcję';
+  $('overrideBase').textContent=isProduct
+    ? `Baza: ${fmt(base.kcal100)} kcal · B ${fmt(base.protein100,1)} g · T ${fmt(base.fat100,1)} g · W ${fmt(base.carbs100,1)} g / 100 g`
+    : `Baza: ${fmt(baseKcal)} kcal / porcję · B ${fmt(base.protein,1)} g · T ${fmt(base.fat,1)} g · W ${fmt(base.carbs,1)} g`;
+  const form=$('overrideForm');
+  for(const field of ['kcal','protein','fat','carbs'])form.elements[field].value=values[field]??'';
+  $('overrideRevert').hidden=!over;
+  $('overrideError').textContent='';
+  $('overrideDialog').showModal();
+}
+function refreshAfterOverride(){renderRecipes();renderProductsView();render();renderWeekly();}
+
+$('entryDate').value=today();$('weekStart').value=today();refreshVesselSelects();
 document.querySelectorAll('.profile-tab').forEach(b=>b.addEventListener('click',()=>setProfile(b.dataset.profile)));
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
 $('entryDate').addEventListener('change',()=>{render();closePortal();});$('weekStart').addEventListener('change',renderWeekly);
@@ -693,20 +992,21 @@ $('onlineSource').addEventListener('change',()=>{state.onlineSource=$('onlineSou
 $('searchButton').addEventListener('click',()=>performSearch());$('productSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();performSearch();}if(e.key==='Escape')closePortal();});
 let searchDebounce; $('productSearch').addEventListener('input',()=>{searchGeneration++;closePortal();$('clearSearch').classList.toggle('hidden',!$('productSearch').value);if($('catalogMode').value==='saved'){clearTimeout(searchDebounce);searchDebounce=setTimeout(()=>performSearch(false),220);}});
 $('clearSearch').addEventListener('click',()=>{$('productSearch').value='';$('clearSearch').classList.add('hidden');closePortal();$('searchStatus').textContent='Wpisz minimum 2 znaki.';});
-$('resultsPortal').addEventListener('click',e=>{const btn=e.target.closest('[data-result]');if(!btn)return;const p=portalResults[Number(btn.dataset.result)];if(p)chooseProduct(p);});
+$('resultsPortal').addEventListener('click',e=>{const fav=e.target.closest('[data-fav-product]');if(fav){toggleFavorite('products',fav.dataset.favProduct);openPortal(portalInput,portalBaseResults);return;}const btn=e.target.closest('[data-result]');if(!btn)return;const p=portalResults[Number(btn.dataset.result)];if(p)chooseProduct(p);});
+$('resultsPortal').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;if(e.target.closest('[data-fav-product]'))return;const btn=e.target.closest('[data-result]');if(!btn)return;e.preventDefault();const p=portalResults[Number(btn.dataset.result)];if(p)chooseProduct(p);});
 window.addEventListener('resize',positionPortal);window.addEventListener('scroll',positionPortal,true);document.addEventListener('pointerdown',e=>{if(e.target.closest('#productSearch')||e.target.closest('#resultsPortal')||e.target.closest('#searchButton'))return;closePortal();});
-$('grams').addEventListener('input',renderPortion);$('unselect').addEventListener('click',()=>{$('selectedPanel').classList.add('hidden');selectedProduct=null;});$('unitShortcuts').addEventListener('click',e=>{const b=e.target.closest('[data-grams]');if(b){$('grams').value=b.dataset.grams;renderPortion();}});
-$('addToDiary').addEventListener('click',()=>{if(!selectedProduct)return;if(selectedProduct.source==='FatSecret'&&selectedProduct.storageAllowed!==true){toast('FatSecret: brak zgody na trwały zapis. Wybierz Open Food Facts lub Zapisana baza.');return;}addEntry(selectedProduct,$('grams').value,$('mealType').value,$('entryDate').value);$('selectedPanel').classList.add('hidden');selectedProduct=null;$('productSearch').value='';$('clearSearch').classList.add('hidden');centerInViewport($('addFoodCard'),{block:'start'});});
-$('productStoreFilter').addEventListener('change',()=>{productsStore=$('productStoreFilter').value;productsLimit=48;renderProductsView();});
+$('grams').addEventListener('input',renderPortion);$('unselect').addEventListener('click',()=>{$('selectedPanel').classList.add('hidden');selectedProduct=null;});$('unitShortcuts').addEventListener('click',e=>{const b=e.target.closest('[data-grams]');if(b){$('grams').value=String(grossFromNet(b.dataset.grams,'productVessel'));renderPortion();}});
+$('addToDiary').addEventListener('click',()=>{if(!selectedProduct)return;if(selectedProduct.source==='FatSecret'&&selectedProduct.storageAllowed!==true){toast('FatSecret: brak zgody na trwały zapis. Wybierz Open Food Facts lub Zapisana baza.');return;}const vessel=vesselById($('productVessel').value);const grams=productNetGrams();if(grams===null||grams<=0||grams>10000){toast(vessel?`Waga z naczyniem musi być większa niż ${fmt(vessel.grams,1)} g.`:'Podaj prawidłową gramaturę od 0,1 do 10 000 g.');return;}const product=selectedProduct;const meal=$('mealType').value;const date=$('entryDate').value;if(addEntry(product,grams,meal,date,{silent:true})){queueShare({kind:'product',id:product.id,name:product.name,meal,date,grams,composition:{items:[{name:product.name,grams,kcal100:Number(product.kcal100),protein100:numOrNull(product.protein100),fat100:numOrNull(product.fat100),carbs100:numOrNull(product.carbs100),meal}],totalGrams:grams,totalKcal:(Number(product.kcal100)||0)*grams/100,portionGrams:grams,portions:1}});save();render();toast(`Dodano: ${product.name} · ${fmt(grams)} g${vessel?' (netto, naczynie odjęte)':''} · ${fmt(Number(product.kcal100)*grams/100)} kcal`);}$('selectedPanel').classList.add('hidden');selectedProduct=null;$('productSearch').value='';$('clearSearch').classList.add('hidden');centerInViewport($('addFoodCard'),{block:'start'});});
+$('productStoreFilter').addEventListener('change',()=>{productsStore=$('productStoreFilter').value;productsLimit=20;renderProductsView();});
 document.querySelectorAll('[data-add-mode]').forEach(button=>button.addEventListener('click',()=>setAddMode(button.dataset.addMode)));
 $('diaryPlan').addEventListener('change',fillDiaryPlanDays);
 $('diaryPlanDay').addEventListener('change',resetPlanQuantity);
 $('addRecipeToDiary').addEventListener('click',()=>{
   const recipe=getDishById($('diaryRecipe').value);
   if(!recipe){toast('Najpierw wybierz danie w zakładce „Dania”.');return;}
-  const unit=$('diaryRecipeUnit').value;
-  const amount=Number(unit==='grams'?$('diaryRecipeGrams').value:$('diaryRecipeServings').value);
-  if(unit!=='grams'&&(!Number.isFinite(amount)||amount<0.25||amount>20)){toast('Liczba porcji musi wynosić od 0,25 do 20.');return;}
+  const unit=$('diaryRecipeUnit').value;const vessel=vesselById($('diaryRecipeVessel').value);const gross=nval($('diaryRecipeGrams').value);
+  const amount=unit==='grams'?(gross===null?null:round1(gross-(vessel?Number(vessel.grams):0))):Number($('diaryRecipeServings').value);
+  if(amount===null||!Number.isFinite(amount)||(unit==='grams'?(amount<=0||amount>10000):(amount<0.25||amount>20))){toast(unit==='grams'?'Waga z naczyniem musi dać jedzenie netto w zakresie 0,1–10 000 g.':'Liczba porcji musi wynosić od 0,25 do 20.');return;}
   if(addCompositionToDiary(recipeComposition(recipe),amount,unit,$('entryDate').value,$('diaryRecipeMeal').value,{label:`danie „${recipe.name}”`})){
     resetDishQuantity();
     centerInViewport($('addFoodCard'),{block:'start'});
@@ -716,14 +1016,50 @@ $('addPlanDayToDiary').addEventListener('click',()=>{
   const plan=(state.plans||[]).find(p=>p.id===$('diaryPlan').value);
   const dayIndex=Number($('diaryPlanDay').value);
   if(!plan||!Number.isFinite(dayIndex))return;
-  const unit=$('diaryPlanUnit').value;
-  const amount=Number(unit==='grams'?$('diaryPlanGrams').value:$('diaryPlanServings').value);
-  if(unit!=='grams'&&(!Number.isFinite(amount)||amount<0.25||amount>20)){toast('Liczba porcji musi wynosić od 0,25 do 20.');return;}
+  const unit=$('diaryPlanUnit').value;const vessel=vesselById($('diaryPlanVessel').value);const gross=nval($('diaryPlanGrams').value);
+  const amount=unit==='grams'?(gross===null?null:round1(gross-(vessel?Number(vessel.grams):0))):Number($('diaryPlanServings').value);
+  if(amount===null||!Number.isFinite(amount)||(unit==='grams'?(amount<=0||amount>10000):(amount<0.25||amount>20))){toast(unit==='grams'?'Waga z naczyniem musi dać jedzenie netto w zakresie 0,1–10 000 g.':'Liczba porcji musi wynosić od 0,25 do 20.');return;}
   if(addPlanDayToDiary(plan.id,dayIndex,{unit,amount,meal:$('diaryPlanMeal').value})){
     resetPlanQuantity();
     centerInViewport($('addFoodCard'),{block:'start'});
   }
 });
+$('diaryRecipeSearch').addEventListener('focus',()=>{drawDiaryPlanResults(false);drawDiaryRecipeResults(true);});
+$('diaryRecipeSearch').addEventListener('input',()=>{
+  const chosen=diaryRecipeList.find(r=>r.id===$('diaryRecipe').value);
+  if(!chosen||chosen.name!==$('diaryRecipeSearch').value){$('diaryRecipe').value='';resetDishQuantity();}
+  syncDiaryClear('diaryRecipeSearch','clearDiaryRecipeSearch');
+  drawDiaryRecipeResults(true);
+});
+$('diaryRecipeSearch').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){drawDiaryRecipeResults(false);return;}
+  if(e.key!=='Enter'||$('diaryRecipeResults').classList.contains('hidden'))return;
+  const first=$('diaryRecipeResults').querySelector('[data-recipe-index]');
+  if(!first)return;
+  e.preventDefault();
+  chooseDiaryRecipe(diaryRecipeResults[Number(first.dataset.recipeIndex)]);
+});
+$('diaryRecipeSearch').addEventListener('blur',()=>setTimeout(()=>drawDiaryRecipeResults(false),180));
+$('diaryRecipeResults').addEventListener('click',e=>{const b=e.target.closest('[data-recipe-index]');if(b)chooseDiaryRecipe(diaryRecipeResults[Number(b.dataset.recipeIndex)]);});
+$('clearDiaryRecipeSearch').addEventListener('click',()=>{$('diaryRecipeSearch').value='';$('diaryRecipe').value='';syncDiaryClear('diaryRecipeSearch','clearDiaryRecipeSearch');drawDiaryRecipeResults(false);resetDishQuantity();});
+$('diaryPlanSearch').addEventListener('focus',()=>{drawDiaryRecipeResults(false);drawDiaryPlanResults(true);});
+$('diaryPlanSearch').addEventListener('input',()=>{
+  const chosen=diaryPlanList.find(p=>p.id===$('diaryPlan').value);
+  if(!chosen||chosen.title!==$('diaryPlanSearch').value){$('diaryPlan').value='';fillDiaryPlanDays();}
+  syncDiaryClear('diaryPlanSearch','clearDiaryPlanSearch');
+  drawDiaryPlanResults(true);
+});
+$('diaryPlanSearch').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){drawDiaryPlanResults(false);return;}
+  if(e.key!=='Enter'||$('diaryPlanResults').classList.contains('hidden'))return;
+  const first=$('diaryPlanResults').querySelector('[data-plan-index]');
+  if(!first)return;
+  e.preventDefault();
+  chooseDiaryPlan(diaryPlanResults[Number(first.dataset.planIndex)]);
+});
+$('diaryPlanSearch').addEventListener('blur',()=>setTimeout(()=>drawDiaryPlanResults(false),180));
+$('diaryPlanResults').addEventListener('click',e=>{const b=e.target.closest('[data-plan-index]');if(b)chooseDiaryPlan(diaryPlanResults[Number(b.dataset.planIndex)]);});
+$('clearDiaryPlanSearch').addEventListener('click',()=>{$('diaryPlanSearch').value='';$('diaryPlan').value='';syncDiaryClear('diaryPlanSearch','clearDiaryPlanSearch');drawDiaryPlanResults(false);fillDiaryPlanDays();});
 $('diaryRecipe').addEventListener('change',resetDishQuantity);
 $('diaryRecipeUnit').addEventListener('change',()=>{syncDishUnit();renderDishPortion();});
 $('diaryRecipeServings').addEventListener('input',renderDishPortion);
@@ -732,7 +1068,7 @@ $('diaryRecipeShortcuts').addEventListener('click',event=>{
   const button=event.target.closest('[data-dish-grams]');
   if(!button)return;
   $('diaryRecipeUnit').value='grams';
-  $('diaryRecipeGrams').value=button.dataset.dishGrams;
+  $('diaryRecipeGrams').value=String(grossFromNet(button.dataset.dishGrams,'diaryRecipeVessel'));
   toggleDishUnitFields();
   renderDishPortion();
 });
@@ -743,9 +1079,47 @@ $('diaryPlanShortcuts').addEventListener('click',event=>{
   const button=event.target.closest('[data-plan-grams]');
   if(!button)return;
   $('diaryPlanUnit').value='grams';
-  $('diaryPlanGrams').value=button.dataset.planGrams;
+  $('diaryPlanGrams').value=String(grossFromNet(button.dataset.planGrams,'diaryPlanVessel'));
   togglePlanUnitFields();
   renderPlanDaySummary();
+});
+$('shareSkip').addEventListener('click',skipShare);
+$('shareForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const rows=[...$('shareItems').querySelectorAll('[data-share-grams]')];
+  const values=rows.map(input=>({index:Number(input.dataset.shareGrams),grams:Number(input.value)}));
+  if(values.some(value=>!Number.isFinite(value.grams)||value.grams<0.1||value.grams>10000)){$('shareError').textContent='Gramatura musi mieścić się w zakresie 0,1–10 000 g.';return;}
+  let added=0;
+  for(const value of values){const item=shareDraft[value.index];if(!item)continue;if(addCompositionToDiary(item.composition,value.grams,'grams',item.date,item.meal,{silent:true}))added++;}
+  $('shareError').textContent='';
+  closeDialog('shareDialog');
+  if(added){save();render();toast(`Skopiowano ${added} ${added===1?'pozycję':added<5?'pozycje':'pozycji'} do zakładki „${profileLabel(activeProfile())}”.`);}
+});
+$('shareItems').addEventListener('input',e=>{
+  const input=e.target.closest('[data-share-grams]');if(!input)return;
+  const item=shareDraft[Number(input.dataset.shareGrams)];if(!item)return;
+  const output=$('shareItems').querySelector(`[data-share-kcal="${input.dataset.shareGrams}"]`);
+  if(output)output.textContent=`${fmt(compositionKcal(item.composition,Number(input.value)||0))} kcal`;
+});
+$('shareDialog').addEventListener('cancel',e=>{e.preventDefault();skipShare();});
+$('shareDialog').addEventListener('close',()=>{if(state.pendingShare){state.pendingShare=null;save();}});
+$('overrideForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  if(!overrideTarget)return;
+  const form=e.currentTarget;const {kind,id}=overrideTarget;
+  const kcal=numOrNull(form.elements.kcal.value);
+  if(kcal===null||kcal<0||kcal>950){$('overrideError').textContent='Podaj kalorie w zakresie 0–950.';return;}
+  const data={protein:numOrNull(form.elements.protein.value),fat:numOrNull(form.elements.fat.value),carbs:numOrNull(form.elements.carbs.value)};
+  if(Object.values(data).some(value=>value!==null&&(value<0||value>100))){$('overrideError').textContent='Składniki muszą mieścić się w zakresie 0–100 g.';return;}
+  const store=overrideStore();const stamp=new Date().toISOString();
+  if(kind==='product')store.products[id]={kcal100:round1(kcal),protein100:data.protein,fat100:data.fat,carbs100:data.carbs,updatedAt:stamp};
+  else store.dishes[id]={kcal:round1(kcal),protein:data.protein,fat:data.fat,carbs:data.carbs,updatedAt:stamp};
+  save();closeDialog('overrideDialog');refreshAfterOverride();toast('Zapisano nadpisane wartości.');
+});
+$('overrideRevert').addEventListener('click',()=>{
+  if(!overrideTarget)return;
+  const store=overrideStore();delete (overrideTarget.kind==='product'?store.products:store.dishes)[overrideTarget.id];
+  save();closeDialog('overrideDialog');refreshAfterOverride();toast('Przywrócono wartości z bazy.');
 });
 $('mealsList').addEventListener('click',e=>{const b=e.target.closest('[data-remove]');if(!b)return;const day=ensureDay($('entryDate').value);day.entries=day.entries.filter(x=>x.id!==b.dataset.remove);save();render();});
 document.querySelectorAll('[data-water]').forEach(b=>b.addEventListener('click',()=>{const day=ensureDay($('entryDate').value);day.water=Math.min(10000,(day.water||0)+Number(b.dataset.water));save();renderHydration(day);}));
@@ -778,13 +1152,17 @@ $('productForm').addEventListener('submit',e=>{
   toast(wasEditing?'Zapisano zmiany produktu.':'Dodano własny produkt.');
 });
 $('productSearchCatalog').addEventListener('input',()=>{
-  productsQuery=$('productSearchCatalog').value;productsLimit=48;
+  productsQuery=$('productSearchCatalog').value;productsLimit=20;
   clearTimeout(productsFilterTimer);
   productsFilterTimer=setTimeout(renderProductsView,160);
 });
-$('loadMoreProducts').addEventListener('click',()=>{productsLimit+=96;renderProductsView();});
+$('loadMoreProducts').addEventListener('click',()=>{productsLimit+=20;renderProductsView();});
 function handleProductAction(event){
   if(event.target.closest('[data-empty-create-product]')){openProductDialog();return;}
+  const fav=event.target.closest('[data-fav-product]');
+  if(fav){toggleFavorite('products',fav.dataset.favProduct);renderProductsView();return;}
+  const override=event.target.closest('[data-override-product]');
+  if(override){openOverrideDialog('product',override.dataset.overrideProduct);return;}
   const use=event.target.closest('[data-use-product]');
   if(use){useProductInDiary(use.dataset.useProduct);return;}
   const edit=event.target.closest('[data-edit-product]');
@@ -818,7 +1196,7 @@ $('planForm').addEventListener('submit',e=>{
   save();closeDialog('planDialog');renderWeekly();toast(existing?'Zapisano zmiany planu.':'Utworzono własny plan tygodniowy.');editingPlanId=null;
 });
 $('createRecipe').addEventListener('click',()=>openRecipeDialog());$('addIngredient').addEventListener('click',()=>createIngredientRow());$('recipeForm').elements.portions.addEventListener('input',updateRecipeTotal);
-$('loadMoreDishes').addEventListener('click',()=>{dishesLimit+=12;renderRecipes();});
+$('loadMoreDishes').addEventListener('click',()=>{dishesLimit+=20;renderRecipes();});
 $('recipeForm').addEventListener('submit',e=>{
   e.preventDefault();const f=e.currentTarget;const ingredients=[...$('ingredientRows').querySelectorAll('.ingredient-row')].map(r=>({name:r.querySelector('.ingredient-name').value.trim(),grams:Number(r.querySelector('.ingredient-grams').value),kcal100:Number(r.querySelector('.ingredient-kcal').value)}));
   if(!f.elements.name.value.trim()||!ingredients.length||ingredients.some(x=>!x.name||!Number.isFinite(x.grams)||x.grams<=0||x.grams>10000||!Number.isFinite(x.kcal100)||x.kcal100<0||x.kcal100>950)){$('recipeError').textContent='Uzupełnij nazwę, składniki, gramaturę (0,1–10 000 g) i kalorie każdego składnika.';return;}
@@ -830,15 +1208,19 @@ $('recipeForm').addEventListener('submit',e=>{
 });
 function handleDishAction(e){
   if(e.target.closest('[data-empty-create-recipe]')){openRecipeDialog();return;}
+  const fav=e.target.closest('[data-fav-dish]');
+  if(fav){toggleFavorite('dishes',fav.dataset.favDish);renderRecipes();return;}
+  const override=e.target.closest('[data-override-dish]');
+  if(override){openOverrideDialog('dish',override.dataset.overrideDish);return;}
   const use=e.target.closest('[data-use-dish]');if(use){useDishInDiary(use.dataset.useDish);return;}
   const edit=e.target.closest('[data-edit-recipe]');if(edit){const r=state.recipes.find(x=>x.id===edit.dataset.editRecipe);if(r)openRecipeDialog(r);return;}
   const del=e.target.closest('[data-delete-recipe]');if(del){const r=state.recipes.find(x=>x.id===del.dataset.deleteRecipe);if(!r)return;const used=state.plans.some(p=>(p.assignments||[]).some(a=>a.recipeId===r.id));const msg=used?`Danie „${r.name}” jest używane w planie tygodniowym. Usunięcie usunie je również z tych planów. Kontynuować?`:`Usunąć danie „${r.name}”?`;if(confirm(msg)){state.recipes=state.recipes.filter(x=>x.id!==r.id);state.plans=state.plans.map(p=>({...p,assignments:(p.assignments||[]).filter(a=>a.recipeId!==r.id)}));save();renderRecipes();renderWeekly();toast('Usunięto danie.');}return;}
 }
 $('customRecipesList').addEventListener('click',handleDishAction);
 $('seedDishesList').addEventListener('click',handleDishAction);
-$('recipeSearch').addEventListener('input',()=>{dishesQuery=$('recipeSearch').value;dishesLimit=10;renderRecipes();});
-$('recipeMealFilter').addEventListener('change',()=>{dishesLimit=10;renderRecipes();});
-$('recipeSourceFilter').addEventListener('change',()=>{dishesLimit=10;renderRecipes();});
+$('recipeSearch').addEventListener('input',()=>{dishesQuery=$('recipeSearch').value;dishesLimit=20;renderRecipes();});
+$('recipeMealFilter').addEventListener('change',()=>{dishesLimit=20;renderRecipes();});
+$('recipeSourceFilter').addEventListener('change',()=>{dishesLimit=20;renderRecipes();});
 
 $('settingsOpen').addEventListener('click',()=>{ $('workerUrl').value=state.workerUrl||'';openDialog('settingsDialog');refreshCatalogStats();});$('aboutOpen').addEventListener('click',()=>openDialog('aboutDialog'));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeDialog(b.dataset.close)));
@@ -847,7 +1229,23 @@ $('testWorker').addEventListener('click',async()=>{try{const h=await checkWorker
 async function refreshCatalogStats(){try{const s=await getCatalogStats();$('catalogInfo').textContent=`Katalog wbudowany: ${fmt(catalogProducts.length)} produktów, w tym ${fmt(productCatalogInfo.storeCount)} sklepowych (Biedronka, Lidl, Kaufland). Baza Open Food Facts: ${fmt(s.count)} rekordów · ostatnia aktualizacja: ${s.updatedAt?new Date(s.updatedAt).toLocaleString('pl-PL'):'brak'}.`; }catch(err){$('catalogInfo').textContent=err.message;}}
 $('catalogFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;$('importStatus').textContent='Rozpoczynam import. Nie zamykaj tej karty.';$('importProgress').value=0;try{const result=await importCatalogFile(file,(pct,stats)=>{$('importProgress').value=pct;$('importStatus').textContent=`Import: ${pct}% · zaimportowano ${fmt(stats.imported)} · odczytano ${fmt(stats.scanned)} rekordów`;});$('importStatus').textContent=`Gotowe: ${fmt(result.imported)} produktów w lokalnej bazie.`;toast('Zaktualizowano zapisaną bazę produktów.');await refreshCatalogStats();}catch(err){$('importStatus').textContent=`Nie udało się zaimportować: ${err.message}`;}finally{e.target.value='';}});
 $('clearCatalog').addEventListener('click',async()=>{if(!confirm('Usunąć zaimportowaną bazę Open Food Facts z tego urządzenia?'))return;try{await clearImportedCatalog();await refreshCatalogStats();toast('Usunięto zaimportowany katalog.');}catch(e){toast(e.message);}});
-$('exportBackup').addEventListener('click',backupData);$('importBackup').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(!imported||typeof imported!=='object'||!imported.profiles||!imported.logs)throw new Error('Nieprawidłowy plik kopii.');state={...defaultState(),...imported};save();render();renderWeekly();renderRecipes();renderProductsView();toast('Zaimportowano kopię danych.');}catch(err){toast(err.message);}finally{e.target.value='';}});
+$('exportBackup').addEventListener('click',backupData);$('importBackup').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(!imported||typeof imported!=='object'||!imported.profiles||!imported.logs)throw new Error('Nieprawidłowy plik kopii.');state={...defaultState(),...imported};save();render();renderWeekly();renderRecipes();renderProductsView();refreshVesselSelects();renderVesselsView();toast('Zaimportowano kopię danych.');}catch(err){toast(err.message);}finally{e.target.value='';}});
+$('createVessel').addEventListener('click',()=>openVesselDialog());
+$('vesselForm').addEventListener('submit',e=>{
+  e.preventDefault();const form=e.currentTarget;const name=form.elements.name.value.trim();const grams=Number(form.elements.grams.value);
+  if(!name||!Number.isFinite(grams)||grams<=0||grams>10000){$('vesselError').textContent='Podaj nazwę i wagę naczynia w zakresie 0,1–10 000 g.';return;}
+  const existing=editingVesselId?(state.vessels||[]).find(v=>v.id===editingVesselId):null;const stamp=new Date().toISOString();
+  if(existing)Object.assign(existing,{name,grams:round1(grams),updatedAt:stamp});
+  else{state.vessels=Array.isArray(state.vessels)?state.vessels:[];state.vessels.push({id:`vessel:${crypto.randomUUID?crypto.randomUUID():Date.now()}`,name,grams:round1(grams),createdAt:stamp,updatedAt:stamp});}
+  editingVesselId=null;save();closeDialog('vesselDialog');renderVesselsView();refreshVesselSelects();toast(existing?'Zapisano zmiany naczynia.':'Dodano naczynie.');
+});
+$('vesselSearch').addEventListener('input',()=>{vesselsQuery=$('vesselSearch').value;renderVesselsView();});
+$('vesselSort').addEventListener('change',()=>{vesselsSort=$('vesselSort').value;renderVesselsView();});
+$('vesselsList').addEventListener('click',handleVesselAction);
+document.querySelectorAll('[data-stats-range]').forEach(button=>button.addEventListener('click',()=>{statsRange=button.dataset.statsRange;renderWeekStats();}));
+$('productVessel').addEventListener('change',()=>{vesselChange('grams','productVessel');renderPortion();});
+$('diaryRecipeVessel').addEventListener('change',()=>{if($('diaryRecipeUnit').value==='grams')vesselChange('diaryRecipeGrams','diaryRecipeVessel');else $('diaryRecipeVessel').dataset.prevVessel=$('diaryRecipeVessel').value;renderDishPortion();});
+$('diaryPlanVessel').addEventListener('change',()=>{if($('diaryPlanUnit').value==='grams')vesselChange('diaryPlanGrams','diaryPlanVessel');else $('diaryPlanVessel').dataset.prevVessel=$('diaryPlanVessel').value;renderPlanDaySummary();});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')closePortal();});
 
 // Account-scoped state: profiles/logs remain split by gender; custom products, plans and recipes
@@ -864,7 +1262,7 @@ async function activateUser(user){
   try{
     const remote=await firebaseSync.load();
     if(remote&&typeof remote==='object'){
-      const base=defaultState();state={...base,...remote,profiles:{...base.profiles,...(remote.profiles||{})},logs:{...base.logs,...(remote.logs||{})},weights:{...base.weights,...(remote.weights||{})},customProducts:Array.isArray(remote.customProducts)?remote.customProducts:[],recipes:Array.isArray(remote.recipes)?remote.recipes:[],plans:Array.isArray(remote.plans)?remote.plans:[]};
+      const base=defaultState();state={...base,...remote,profiles:{...base.profiles,...(remote.profiles||{})},logs:{...base.logs,...(remote.logs||{})},weights:{...base.weights,...(remote.weights||{})},customProducts:Array.isArray(remote.customProducts)?remote.customProducts:[],recipes:Array.isArray(remote.recipes)?remote.recipes:[],plans:Array.isArray(remote.plans)?remote.plans:[],vessels:Array.isArray(remote.vessels)?remote.vessels:[],favorites:{products:Array.isArray(remote.favorites?.products)?remote.favorites.products:[],dishes:Array.isArray(remote.favorites?.dishes)?remote.favorites.dishes:[]},overrides:{products:remote.overrides?.products&&typeof remote.overrides.products==='object'?remote.overrides.products:{},dishes:remote.overrides?.dishes&&typeof remote.overrides.dishes==='object'?remote.overrides.dishes:{}},pendingShare:remote.pendingShare&&Array.isArray(remote.pendingShare.items)?remote.pendingShare:null};
     }else{
       // One-time migration of the previous anonymous local profile into the first account on this device.
       const legacy=localStorage.getItem(STORE_KEY);
@@ -883,7 +1281,7 @@ async function activateUser(user){
   document.body.dataset.profile=state.activeProfile||'female';
   document.querySelectorAll('.profile-tab').forEach(b=>b.classList.toggle('active',b.dataset.profile===state.activeProfile));
   $('catalogMode').value=state.catalogMode||'saved';$('onlineSource').value=state.onlineSource||'fatsecret';$('sourceControl').classList.toggle('hidden',$('catalogMode').value!=='online');
-  render();renderRecipes();renderWeekly();renderProductsView();showView('diary');hideAuthGate(user);
+  render();renderRecipes();renderWeekly();renderProductsView();refreshVesselSelects();renderVesselsView();showView('diary');hideAuthGate(user);
   if(profilesNeedInitialSetup(state.profiles))setTimeout(openBothProfilesDialog,220);
 }
 
