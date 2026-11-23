@@ -1520,3 +1520,467 @@ const pinsaNoData = products.find(p=>p.id==='biedronka:0001174361');
 if (pinsaNoData) { pinsaNoData.dataNote = 'Oficjalna karta produktu zawierała wartości 0 będące placeholderem; nie uzyskano wiarygodnej etykiety liczbowej. Wszystkie pola żywieniowe, w tym kcal, są oszacowane dla podobnej pinsy; nie są to dane producenta.'; pinsaNoData.nutritionMethod = 'Cały profil odżywczy oszacowany od zbliżonych produktów piekarniczych/pizza; brak wiarygodnej deklaracji konkretnego SKU.'; pinsaNoData.nutritionConfidence = 'low'; }
 productCatalogInfo.nutritionQuality.estimatedRows = products.filter(p=>p.nutrientProvenance.energy100==='estimated-reference').length;
 productCatalogInfo.nutritionQuality.officialEnergyEstimatedMacrosOrFiber = products.filter(p=>p.nutrientProvenance.energy100==='official-retailer-card' && Object.values(p.nutrientProvenance).some(v=>v!=='official-retailer-card')).length;
+// -----------------------------------------------------------------------------
+// NAPOJE — rozszerzenie katalogu bez zmiany schematu produktu.
+// Wszystkie wartości w kcal100/protein100/fat100/carbs100/fiber100 są na 100 g.
+// UnitWeight oznacza typową porcję w gramach; interfejs nie potrzebuje ml/l.
+// -----------------------------------------------------------------------------
+const BEVERAGE_AUDIT_DATE = '2026-11-23';
+const roundBeverage = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const addIfNewBeverage = record => {
+  if (!products.some(existing => existing.id === record.id)) products.push(record);
+};
+
+// Producenci deklarują większość napojów w 100 ml. Ponieważ model aplikacji
+// przechowuje wyłącznie gramy, przeliczamy wartości przez oszacowaną gęstość
+// napoju (g/ml). Wiersz pozostaje jasno oznaczony jako przeliczenie, a nie
+// oficjalna deklaracja na 100 g. Gęstości są przybliżone i produktowo zmienne.
+function addOfficialBeverageFrom100ml({id,name,brand,per100ml,density=1.0,sourceUrl,sourceLabel,unitWeight=250,aliases=[],fiberDeclared=false}) {
+  const [kcal,protein,fat,carbs,fiber=0] = per100ml;
+  const div = Number(density) || 1;
+  const values = [kcal,protein,fat,carbs,fiber].map(v => roundBeverage(v / div));
+  const provenance = {
+    energy100:'manufacturer-official-label-per-100ml; converted-to-100g-by-estimated-density',
+    protein100:'manufacturer-official-label-per-100ml; converted-to-100g-by-estimated-density',
+    fat100:'manufacturer-official-label-per-100ml; converted-to-100g-by-estimated-density',
+    carbs100:'manufacturer-official-label-per-100ml; converted-to-100g-by-estimated-density',
+    fiber100:fiberDeclared ? 'manufacturer-official-label-per-100ml; converted-to-100g-by-estimated-density' : 'not-declared-on-label; recorded-as-zero-for-clear-beverage'
+  };
+  addIfNewBeverage({
+    id:`drink:${id}`, name, brand, category:'Napoje', store:'Ogólne',
+    source:`${sourceLabel} · oficjalna informacja żywieniowa producenta (wartości na 100 ml)`,
+    sourceKind:'manufacturer-official', sourceUrl,
+    sourceLicense:'Dane przepisane z publicznej informacji żywieniowej producenta. Wartości źródłowe dotyczą 100 ml; zapis w aplikacji na 100 g wymaga przybliżonej gęstości i nie jest dosłowną etykietą 100 g.',
+    kcal100:values[0], protein100:values[1], fat100:values[2], carbs100:values[3], fiber100:values[4],
+    unitWeight, aliases,
+    dataNote:`Producent deklaruje wartości na 100 ml. Dla zgodności z modelem gramowym przeliczono je na 100 g przez gęstość ${div} g/ml. Gęstość jest przybliżona; etykieta konkretnego opakowania i jego gramatura mają pierwszeństwo. Błonnik ${fiberDeclared?'został przeliczony z deklaracji producenta':'nie jest wymieniony w deklaracji; dla klarownego napoju bez składników błonnikowych zapisano 0 g'}.`,
+    nutritionStatus:'manufacturer-label-per-100ml-converted-to-100g',
+    nutritionConfidence:'medium; producent podaje wartości na 100 ml, konwersja do 100 g używa przybliżonej gęstości',
+    nutritionMethod:`Konwersja 100 ml → 100 g: każda wartość z etykiety podzielona przez ${div} g/ml. Nie jest to bezpośrednia deklaracja producenta na 100 g.`,
+    nutritionCheckedAt:BEVERAGE_AUDIT_DATE, sourceRefs:[sourceUrl], nutrientProvenance:provenance,
+    carbsConvention:'węglowodany deklarowane na etykiecie UE; błonnik jako osobne pole',
+    referenceFrameworks:['https://food.ec.europa.eu/food-safety/labelling-and-nutrition/food-information-consumers-legislation_en']
+  });
+}
+
+// Oficjalne napoje markowe — źródła producentów, deklaracje na 100 ml.
+addOfficialBeverageFrom100ml({id:'coca-cola-original',name:'Coca-Cola Original Taste',brand:'Coca-Cola',per100ml:[42,0,0,10.6,0],density:1.04,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/brand-products-coca-cola',sourceLabel:'Coca-Cola Polska',aliases:['coca cola','cola klasyczna','coca-cola zwykła']});
+addOfficialBeverageFrom100ml({id:'coca-cola-cherry',name:'Coca-Cola Cherry',brand:'Coca-Cola',per100ml:[43,0,0,10.7,0],density:1.04,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/brand-products-coca-cola',sourceLabel:'Coca-Cola Polska',aliases:['cola cherry','coca cola wiśniowa']});
+addOfficialBeverageFrom100ml({id:'coca-cola-zero',name:'Coca-Cola Zero Cukru',brand:'Coca-Cola',per100ml:[0.2,0,0,0,0],density:1.0,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/coca-cola-zero-sugar',sourceLabel:'Coca-Cola Polska',aliases:['cola zero','coca cola zero','zero cukru']});
+addOfficialBeverageFrom100ml({id:'fanta-orange',name:'Fanta Orange',brand:'Fanta',per100ml:[17,0,0,4.1,0],density:1.02,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/fanta',sourceLabel:'Coca-Cola Polska / Fanta',aliases:['fanta pomarańczowa','fanta orange']});
+addOfficialBeverageFrom100ml({id:'fanta-orange-zero',name:'Fanta Orange Zero',brand:'Fanta',per100ml:[3,0,0,0.4,0],density:1.005,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/fanta',sourceLabel:'Coca-Cola Polska / Fanta',aliases:['fanta zero','fanta pomarańczowa zero']});
+addOfficialBeverageFrom100ml({id:'fanta-lemon-zero',name:'Fanta Lemon Zero',brand:'Fanta',per100ml:[2,0,0,0.1,0],density:1.002,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/fanta',sourceLabel:'Coca-Cola Polska / Fanta',aliases:['fanta cytrynowa zero']});
+addOfficialBeverageFrom100ml({id:'sprite-zero',name:'Sprite Zero',brand:'Sprite',per100ml:[1,0,0,0,0],density:1.0,sourceUrl:'https://www.coca-cola.com/pl/pl/brands/sprite',sourceLabel:'Coca-Cola Polska / Sprite',aliases:['sprite zero','sprite bez cukru']});
+addOfficialBeverageFrom100ml({id:'pepsi-original',name:'Pepsi',brand:'Pepsi',per100ml:[28,0,0,7,0],density:1.027,sourceUrl:'https://www.pepsi.pl/produkty/pepsi',sourceLabel:'Pepsi Polska',aliases:['pepsi cola','pepsi klasyczna']});
+addOfficialBeverageFrom100ml({id:'red-bull-original',name:'Red Bull Energy Drink',brand:'Red Bull',per100ml:[46,0,0,11,0],density:1.04,sourceUrl:'https://www.redbull.com/pl-pl/energydrink/products/red-bull-energy-drink-ingredients-list',sourceLabel:'Red Bull Polska',aliases:['redbull','red bull energetyk','napój energetyczny red bull']});
+addOfficialBeverageFrom100ml({id:'tymbark-jablko-gruszka-drink',name:'Tymbark Jabłko–Gruszka (napój owocowy)',brand:'Tymbark',per100ml:[19,0,0,4.7,0],density:1.02,sourceUrl:'https://tymbark.com/produkt/jablko-gruszka/',sourceLabel:'Tymbark',aliases:['tymbark jabłko gruszka napój','jabłko gruszka tymbark napój']});
+addOfficialBeverageFrom100ml({id:'tymbark-jablko-z-gruszka-juice',name:'Tymbark Jabłko z gruszką (sok/nektar)',brand:'Tymbark',per100ml:[24,0,0,5.3,0.6],density:1.02,sourceUrl:'https://tymbark.com/produkt/jablko-z-gruszka/',sourceLabel:'Tymbark',aliases:['tymbark jabłko z gruszką sok','sok jabłko gruszka tymbark'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'tymbark-orange-juice',name:'Tymbark Sok Pomarańcza 100%',brand:'Tymbark',per100ml:[44,0.6,0,10,0],density:1.04,sourceUrl:'https://tymbark.com/produkt/pomarancza-bez-dodatku-cukru/',sourceLabel:'Tymbark',aliases:['sok pomarańczowy tymbark','tymbark pomarańcza 100 procent']});
+addOfficialBeverageFrom100ml({id:'tymbark-orange-mandarin',name:'Tymbark Pomarańcza z mandarynką (nektar)',brand:'Tymbark',per100ml:[21,0,0,4.8,0],density:1.02,sourceUrl:'https://tymbark.com/produkt/pomarancza-mandarynka/',sourceLabel:'Tymbark',aliases:['tymbark pomarańcza mandarynka','nektar pomarańcza mandarynka']});
+addOfficialBeverageFrom100ml({id:'tymbark-spinach-kiwi',name:'Tymbark Szpinak z kiwi 100%',brand:'Tymbark',per100ml:[35,0.25,0,7.7,0.5],density:1.03,sourceUrl:'https://tymbark.com/type-product/sok-100/',sourceLabel:'Tymbark',aliases:['sok szpinak kiwi tymbark','tymbark sok warzywny'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'alpro-soy-original',name:'Alpro Napój Sojowy Original',brand:'Alpro',per100ml:[39,3,1.7,2.5,0.5],density:1.03,sourceUrl:'https://www.alpro.com/pl/produkty/napoje/alpro-sojowe',sourceLabel:'Alpro Polska',aliases:['alpro sojowe original','napój sojowy alpro'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'alpro-soy-unsweetened',name:'Alpro Napój Sojowy Bez Cukru',brand:'Alpro',per100ml:[33,3.3,1.8,0,0.6],density:1.03,sourceUrl:'https://www.alpro.com/pl/produkty/napoje/alpro-sojowe-nieslodzone/',sourceLabel:'Alpro Polska',aliases:['alpro sojowe niesłodzone','alpro sojowe bez cukru'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'alpro-almond-original',name:'Alpro Napój Migdałowy Original',brand:'Alpro',per100ml:[22,0.4,1.1,2.4,0.4],density:1.02,sourceUrl:'https://www.alpro.com/pl/produkty/napoje/alpro-migdalowe',sourceLabel:'Alpro Polska',aliases:['alpro migdałowe','napój migdałowy alpro'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'alpro-almond-unsweetened',name:'Alpro Napój Migdałowy Bez Cukru',brand:'Alpro',per100ml:[13,0.4,1.1,0,0.3],density:1.02,sourceUrl:'https://www.alpro.com/pl/produkty/napoje/alpro-z-migdalow-prazonych-nieslodzone',sourceLabel:'Alpro Polska',aliases:['alpro migdałowe bez cukru','alpro migdałowe niesłodzone'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'oatly-whole-oat',name:'Oatly Napój Owsiany Pełny',brand:'Oatly',per100ml:[58,1,2.7,6.9,0.9],density:1.03,sourceUrl:'https://www.oatly.com/pl-pl/products/oat-drink/oat-drink-whole-2-8-1l',sourceLabel:'Oatly Polska',aliases:['oatly whole','oatly pełny','napój owsiany oatly'],fiberDeclared:true});
+addOfficialBeverageFrom100ml({id:'oatly-semi-oat',name:'Oatly Napój Owsiany Semi',brand:'Oatly',per100ml:[48,1.1,1.5,7.1,0.8],density:1.03,sourceUrl:'https://www.oatly.com/pl-pl/random-answers/17-facts-about-oatly-and-nutrition',sourceLabel:'Oatly Polska',aliases:['oatly semi','oatly półtłusty'],fiberDeclared:true});
+
+// Składniki do obliczania napojów domowych. Każdy profil jest na 100 g.
+// Wartości kawy/herbaty/kakao: USDA FDC; mleka, cukry, owoce i syropy —
+// profile referencyjne. Napój roślinny: dane producentów po konwersji ml→g.
+const DRINK_INGREDIENTS = {
+  water:{v:[0,0,0,0,0],source:'woda; 0 kcal i makro'},
+  coffee:{v:[1,0.12,0.02,0,0],source:'USDA FDC 171890; kawa parzona'},
+  instantCoffeeDry:{v:[353,12.2,0.5,75.4,0],source:'USDA FDC 171893; kawa rozpuszczalna w proszku'},
+  espresso:{v:[9,0.12,0.18,1.67,0],source:'USDA FDC 171891; espresso parzone'},
+  decaf:{v:[1,0.12,0.02,0,0],source:'profil referencyjny kawy parzonej bezkofeinowej'},
+  tea:{v:[1,0,0,0.3,0],source:'USDA FDC 173227; herbata czarna parzona'},
+  teaHerbal:{v:[1,0,0,0.2,0],source:'profil referencyjny naparu ziołowego; szacunek'},
+  milk05:{v:[38,3.4,0.5,4.9,0],source:'profil referencyjny mleka 0,5%'},
+  milk2:{v:[50,3.4,2,4.8,0],source:'profil referencyjny mleka 2%'},
+  milk32:{v:[62,3.2,3.2,4.7,0],source:'profil referencyjny mleka 3,2%'},
+  soy:{v:[roundBeverage(33/1.03),roundBeverage(3.3/1.03),roundBeverage(1.8/1.03),0,roundBeverage(0.6/1.03)],source:'Alpro sojowe bez cukru; etykieta na 100 ml przeliczona gęstością 1,03 g/ml'},
+  oat:{v:[roundBeverage(58/1.03),roundBeverage(1/1.03),roundBeverage(2.7/1.03),roundBeverage(6.9/1.03),roundBeverage(0.9/1.03)],source:'Oatly pełny; etykieta na 100 ml przeliczona gęstością 1,03 g/ml'},
+  almond:{v:[roundBeverage(13/1.02),roundBeverage(0.4/1.02),roundBeverage(1.1/1.02),0,roundBeverage(0.3/1.02)],source:'Alpro migdałowe bez cukru; etykieta na 100 ml przeliczona gęstością 1,02 g/ml'},
+  sugar:{v:[400,0,0,100,0],source:'cukier biały; profil referencyjny'},
+  honey:{v:[304,0.3,0,82.4,0],source:'miód; profil referencyjny, bez błonnika'},
+  cocoa:{v:[228,19.6,13.7,20.9,37],source:'USDA FDC 19165; kakao niesłodzone, węglowodany przyswajalne = węglowodany ogółem minus błonnik'},
+  lemon:{v:[22,0.35,0.24,6.9,0.3],source:'sok z cytryny; profil referencyjny'},
+  appleJuice:{v:[46,0.1,0.1,9.1,0.2],source:'sok jabłkowy 100%; profil referencyjny'},
+  banana:{v:[89,1.1,0.3,20.2,2.6],source:'banan; USDA-style profile, węglowodany przyswajalne'},
+  strawberry:{v:[32,0.7,0.3,5.7,2],source:'truskawki; profil referencyjny'},
+  mango:{v:[60,0.8,0.4,13.4,1.6],source:'mango; profil referencyjny'},
+  yogurt:{v:[60,4.3,2,6,0],source:'jogurt naturalny 2%; profil referencyjny'},
+  kefir:{v:[51,3.4,2,4.7,0],source:'kefir naturalny 2%; profil referencyjny'},
+  vanillaSyrup:{v:[280,0,0,70,0],source:'syrop waniliowy; szacunek dla syropu cukrowego'},
+  caramelSyrup:{v:[300,0,0,75,0],source:'syrop karmelowy; szacunek dla syropu cukrowego'},
+  tapioca:{v:[130,0.2,0.1,31.5,0.2],source:'ugotowane perełki tapioki; szacunek zależny od receptury'},
+  chocolate:{v:[546,7.8,36,46,10],source:'czekolada gorzka; przybliżony profil referencyjny'}
+};
+
+function addRecipeBeverage({id,name,parts,unitWeight=200,aliases=[],note='',sourceRefs=[]}) {
+  if (products.some(existing => existing.id === `drink-home:${id}`)) return;
+  const totalGrams = parts.reduce((sum,part)=>sum+part[1],0);
+  const totals = [0,0,0,0,0];
+  for (const [ingredient,grams] of parts) {
+    const profile = DRINK_INGREDIENTS[ingredient];
+    if (!profile) throw new Error(`Brak profilu składnika napoju: ${ingredient}`);
+    profile.v.forEach((value,index)=>{ totals[index] += value * grams / 100; });
+  }
+  const values = totals.map(value=>roundBeverage(value*100/totalGrams));
+  const composition = parts.map(([ingredient,grams])=>`${ingredient}: ${grams} g`).join('; ');
+  const ingredientSources = [...new Set(parts.map(([ingredient])=>DRINK_INGREDIENTS[ingredient].source))].join(' | ');
+  addIfNewBeverage({
+    id:`drink-home:${id}`, name, brand:'', category:'Napoje', store:'Ogólne',
+    source:'Receptura domowa — obliczenie z gramatur składników i referencyjnych profili odżywczych',
+    sourceKind:'recipe-calculated-reference', sourceUrl:'https://fdc.nal.usda.gov/',
+    sourceLicense:'Autorskie wyliczenie receptury z profili referencyjnych USDA FDC i danych producentów; nie jest etykietą gotowego produktu handlowego.',
+    kcal100:values[0],protein100:values[1],fat100:values[2],carbs100:values[3],fiber100:values[4],
+    unitWeight, aliases,
+    dataNote:`Wartości na 100 g gotowego napoju. Receptura obliczeniowa (łączna masa ${totalGrams} g): ${composition}. ${note} Woda, napar i składniki policzone wagowo; rzeczywista receptura, parowanie, ekstrakcja i marka składnika mogą zmienić wynik. Składniki i ich źródła profili: ${ingredientSources}.`,
+    nutritionStatus:'recipe-calculated-reference-estimate',
+    nutritionConfidence:'medium; dokładne proporcje wagowe zdefiniowane, lecz część profili składników jest referencyjna, a ekstrakcja naparu zmienna',
+    nutritionMethod:'Bilans masowy receptury: suma kcal i makroskładników składników przeliczonych proporcjonalnie do gramów, następnie na 100 g gotowego napoju. Bez konwersji ml/l.',
+    nutritionCheckedAt:BEVERAGE_AUDIT_DATE,
+    sourceRefs:[...new Set(['https://fdc.nal.usda.gov/',...sourceRefs,...parts.flatMap(([ingredient])=>({coffee:['https://fdc.nal.usda.gov/food-details/171890/nutrients'],espresso:['https://fdc.nal.usda.gov/food-details/171891/nutrients'],decaf:['https://fdc.nal.usda.gov/food-details/171889/nutrients'],tea:['https://fdc.nal.usda.gov/food-details/173227/nutrients'],cocoa:['https://fdc.nal.usda.gov/food-details/19165/nutrients'],soy:['https://www.alpro.com/pl/produkty/napoje/alpro-sojowe-nieslodzone/'],oat:['https://www.oatly.com/pl-pl/products/oat-drink/oat-drink-whole-2-8-1l'],almond:['https://www.alpro.com/pl/produkty/napoje/alpro-z-migdalow-prazonych-nieslodzone'],appleJuice:['https://www.tymbark.com/'],lemon:['https://fdc.nal.usda.gov/']}[ingredient]||[]))])],
+    nutrientProvenance:{energy100:'calculated-from-reference-ingredient-profiles',protein100:'calculated-from-reference-ingredient-profiles',fat100:'calculated-from-reference-ingredient-profiles',carbs100:'calculated-from-reference-ingredient-profiles',fiber100:'calculated-from-reference-ingredient-profiles'},
+    carbsConvention:'węglowodany przyswajalne; błonnik osobno; kakao USDA znormalizowane przez odjęcie błonnika od węglowodanów ogółem'
+  });
+}
+
+// Kawa — czarna, mleczna, słodzona, roślinna, zimna i kawiarniana.
+const coffeeRecipes = [
+  ['black-filter','Domowa kawa czarna filtrowana bez cukru',[['coffee',200]],['kawa czarna','kawa przelewowa','black coffee']],
+  ['espresso','Espresso bez cukru',[['espresso',35]],['espresso']],
+  ['decaf','Domowa kawa bezkofeinowa czarna',[['decaf',200]],['decaf','kawa bezkofeinowa']],
+  ['instant','Kawa rozpuszczalna przygotowana bez cukru',[['water',198],['instantCoffeeDry',2]],['kawa instant','kawa rozpuszczalna']],
+  ['americano','Americano bez mleka i cukru',[['water',170],['espresso',30]],['americano']],
+  ['coffee-milk05','Kawa z mlekiem 0,5% bez cukru (80:20)',[['coffee',160],['milk05',40]],['kawa z mlekiem odtłuszczonym']],
+  ['coffee-milk2','Kawa z mlekiem 2% bez cukru (80:20)',[['coffee',160],['milk2',40]],['kawa z mlekiem 2 procent']],
+  ['coffee-milk32','Kawa z mlekiem 3,2% bez cukru (80:20)',[['coffee',160],['milk32',40]],['kawa z mlekiem pełnym']],
+  ['coffee-milk2-half','Kawa pół na pół z mlekiem 2%',[['coffee',100],['milk2',100]],['kawa pół na pół mleko']],
+  ['coffee-soy','Kawa z napojem sojowym bez cukru', [['coffee',160],['soy',40]],['kawa sojowa']],
+  ['coffee-oat','Kawa z napojem owsianym', [['coffee',160],['oat',40]],['kawa owsiana']],
+  ['coffee-almond','Kawa z napojem migdałowym bez cukru', [['coffee',160],['almond',40]],['kawa migdałowa']],
+  ['coffee-sugar-1','Kawa czarna z 1 łyżeczką cukru (4 g)',[['coffee',196],['sugar',4]],['kawa z cukrem','kawa jedna łyżeczka cukru']],
+  ['coffee-sugar-2','Kawa czarna z 2 łyżeczkami cukru (8 g)',[['coffee',192],['sugar',8]],['kawa dwie łyżeczki cukru']],
+  ['coffee-honey','Kawa czarna z 1 łyżeczką miodu (5 g)',[['coffee',195],['honey',5]],['kawa z miodem']],
+  ['coffee-vanilla','Kawa czarna z syropem waniliowym (10 g)',[['coffee',190],['vanillaSyrup',10]],['kawa waniliowa syrop']],
+  ['coffee-caramel','Kawa czarna z syropem karmelowym (10 g)',[['coffee',190],['caramelSyrup',10]],['kawa karmelowa syrop']],
+  ['latte','Caffe latte na mleku 2% bez cukru', [['milk2',170],['espresso',30]],['latte','cafe latte']],
+  ['latte-sugar','Caffe latte na mleku 2% z cukrem (4 g)',[['milk2',166],['espresso',30],['sugar',4]],['latte z cukrem']],
+  ['latte-honey','Caffe latte na mleku 2% z miodem (5 g)',[['milk2',165],['espresso',30],['honey',5]],['latte z miodem']],
+  ['latte-oat','Latte na napoju owsianym Oatly', [['oat',170],['espresso',30]],['oat latte']],
+  ['latte-soy','Latte na napoju sojowym Alpro bez cukru', [['soy',170],['espresso',30]],['soy latte']],
+  ['latte-almond','Latte na napoju migdałowym Alpro bez cukru', [['almond',170],['espresso',30]],['almond latte']],
+  ['latte-vanilla','Latte waniliowe (10 g syropu)',[['milk2',160],['espresso',30],['vanillaSyrup',10]],['vanilla latte']],
+  ['latte-caramel','Latte karmelowe (10 g syropu)',[['milk2',160],['espresso',30],['caramelSyrup',10]],['caramel latte']],
+  ['cappuccino','Cappuccino na mleku 2% bez cukru', [['milk2',150],['espresso',50]],['cappuccino']],
+  ['flat-white','Flat white na mleku 2%', [['milk2',130],['espresso',70]],['flat white']],
+  ['cortado','Cortado na mleku 2%', [['milk2',100],['espresso',100]],['cortado']],
+  ['macchiato','Espresso macchiato z mlekiem 2%', [['espresso',30],['milk2',20]],['macchiato']],
+  ['iced-coffee','Kawa mrożona z mlekiem 2% bez cukru', [['coffee',120],['milk2',50],['water',30]],['iced coffee']],
+  ['iced-latte','Iced latte na mleku 2% bez cukru', [['milk2',130],['espresso',30],['water',40]],['kawa latte na zimno']],
+  ['mocha','Mocha na mleku 2% z kakao i cukrem', [['milk2',150],['espresso',25],['cocoa',15],['sugar',10]],['mocha','mokka kawa czekoladowa']]
+];
+for (const [id,name,parts,aliases] of coffeeRecipes) addRecipeBeverage({id:`coffee-${id}`,name,parts,aliases,unitWeight: id==='espresso'?35:200,sourceRefs:['https://fdc.nal.usda.gov/food-details/171890/nutrients','https://fdc.nal.usda.gov/food-details/171891/nutrients','https://fdc.nal.usda.gov/food-details/171893/nutrients']});
+
+// Herbata i napary — baza to napar, a dodatki są wliczane wagowo.
+const teaRecipes = [
+  ['black','Herbata czarna parzona bez cukru',[['tea',200]],['herbata czarna','czarna herbata']],
+  ['green','Herbata zielona parzona bez cukru',[['tea',200]],['herbata zielona','zielona herbata']],
+  ['white','Herbata biała parzona bez cukru',[['tea',200]],['herbata biała']],
+  ['rooibos','Rooibos parzony bez cukru',[['teaHerbal',200]],['rooibos']],
+  ['mint','Napar miętowy bez cukru',[['teaHerbal',200]],['herbata miętowa','mięta napar']],
+  ['chamomile','Napar rumiankowy bez cukru',[['teaHerbal',200]],['rumianek','herbata rumiankowa']],
+  ['fruit','Herbata owocowa parzona bez cukru',[['teaHerbal',200]],['herbata owocowa']],
+  ['hibiscus','Napar z hibiskusa bez cukru',[['teaHerbal',200]],['hibiskus']],
+  ['yerba','Yerba mate parzona bez cukru',[['teaHerbal',200]],['yerba mate','mate napar']],
+  ['black-sugar','Herbata czarna z 1 łyżeczką cukru (4 g)',[['tea',196],['sugar',4]],['herbata z cukrem']],
+  ['black-sugar-2','Herbata czarna z 2 łyżeczkami cukru (8 g)',[['tea',192],['sugar',8]],['herbata dwie łyżeczki cukru']],
+  ['black-honey','Herbata czarna z 1 łyżeczką miodu (5 g)',[['tea',195],['honey',5]],['herbata z miodem']],
+  ['black-lemon','Herbata czarna z cytryną (10 g soku)',[['tea',190],['lemon',10]],['herbata z cytryną']],
+  ['black-honey-lemon','Herbata czarna z miodem i cytryną', [['tea',185],['honey',5],['lemon',10]],['herbata miód cytryna']],
+  ['black-milk','Herbata z mlekiem 2% bez cukru', [['tea',180],['milk2',20]],['bawarka','herbata z mlekiem']],
+  ['black-milk-sugar','Herbata z mlekiem 2% i cukrem', [['tea',176],['milk2',20],['sugar',4]],['bawarka z cukrem']],
+  ['iced-unsweetened','Herbata mrożona domowa bez cukru', [['tea',180],['water',20]],['iced tea bez cukru']],
+  ['iced-sugar','Herbata mrożona domowa słodzona (10 g cukru)',[['tea',190],['sugar',10]],['ice tea słodzona']],
+  ['chai-latte','Chai latte na mleku 2% z cukrem', [['tea',40],['milk2',150],['sugar',10]],['chai latte']],
+  ['bubble-milk-tea','Bubble tea mleczna z tapioką i cukrem (wariant domowy)',[['tea',120],['milk2',35],['tapioca',30],['sugar',15]],['boba tea','bubble tea']],
+];
+for (const [id,name,parts,aliases] of teaRecipes) addRecipeBeverage({id:`tea-${id}`,name,parts,aliases,unitWeight:200,sourceRefs:['https://fdc.nal.usda.gov/food-details/173227/nutrients']});
+
+// Kakao i gorąca czekolada — kakao USDA ma 57,9 g węglowodanów ogółem,
+// w tym 37 g błonnika; w polu carbs100 zapisujemy 20,9 g przyswajalnych.
+const cocoaRecipes = [
+  ['milk-unsweetened','Kakao na mleku 2% bez cukru', [['milk2',180],['cocoa',20]], ['kakao domowe bez cukru']],
+  ['milk-sugar','Kakao na mleku 2% z cukrem', [['milk2',170],['cocoa',20],['sugar',10]], ['kakao z cukrem']],
+  ['milk-honey','Kakao na mleku 2% z miodem', [['milk2',175],['cocoa',20],['honey',5]], ['kakao z miodem']],
+  ['water-unsweetened','Kakao na wodzie bez cukru', [['water',180],['cocoa',20]], ['kakao na wodzie bez cukru']],
+  ['water-sugar','Kakao na wodzie z cukrem', [['water',170],['cocoa',20],['sugar',10]], ['kakao z wodą i cukrem']],
+  ['oat','Kakao na napoju owsianym', [['oat',180],['cocoa',20]], ['kakao owsiane']],
+  ['soy','Kakao na napoju sojowym bez cukru', [['soy',180],['cocoa',20]], ['kakao sojowe']],
+  ['hot-chocolate','Gęsta czekolada na mleku (kakao, czekolada, cukier)', [['milk2',160],['cocoa',15],['chocolate',15],['sugar',10]], ['gorąca czekolada']],
+];
+for (const [id,name,parts,aliases] of cocoaRecipes) addRecipeBeverage({id:`cocoa-${id}`,name,parts,aliases,unitWeight:200,sourceRefs:['https://fdc.nal.usda.gov/food-details/19165/nutrients']});
+
+// Pozostałe popularne napoje domowe.
+const otherDrinkRecipes = [
+  ['lemonade-light','Domowa lemoniada cytrynowa lekko słodzona', [['water',185],['lemon',10],['sugar',5]], ['lemoniada domowa']],
+  ['lemonade-sweet','Domowa lemoniada cytrynowa słodka', [['water',175],['lemon',10],['sugar',15]], ['lemoniada słodka']],
+  ['lemonade-honey','Domowa lemoniada z miodem', [['water',180],['lemon',10],['honey',10]], ['lemoniada z miodem']],
+  ['lemon-mint-water','Woda z cytryną i miętą (bez cukru)', [['water',190],['lemon',5],['teaHerbal',5]], ['woda cytryna mięta']],
+  ['apple-compote','Domowy kompot jabłkowy lekko słodzony', [['water',110],['appleJuice',70],['sugar',10],['lemon',10]], ['kompot jabłkowy']],
+  ['banana-milk','Koktajl bananowy na mleku 2%', [['milk2',150],['banana',50]], ['koktajl bananowy','shake bananowy']],
+  ['banana-kefir','Koktajl bananowy na kefirze', [['kefir',150],['banana',50]], ['kefir bananowy']],
+  ['strawberry-yogurt','Koktajl truskawkowy na jogurcie', [['yogurt',140],['strawberry',60]], ['koktajl truskawkowy']],
+  ['mango-soy','Koktajl mango na napoju sojowym', [['soy',140],['mango',60]], ['koktajl mango']],
+  ['banana-cocoa','Koktajl bananowo-kakaowy na mleku', [['milk2',140],['banana',40],['cocoa',15],['honey',5]], ['koktajl banan kakao']],
+  ['lassi-mango','Mango lassi na jogurcie naturalnym', [['yogurt',100],['mango',60],['water',40]], ['mango lassi']],
+  ['milkshake-vanilla','Domowy shake waniliowy na mleku i lodach (szacunek)', [['milk2',130],['vanillaSyrup',10],['chocolate',10],['water',50]], ['milkshake waniliowy']],
+];
+for (const [id,name,parts,aliases] of otherDrinkRecipes) addRecipeBeverage({id:`other-${id}`,name,parts,aliases,unitWeight:200,sourceRefs:['https://fdc.nal.usda.gov/']});
+
+// Korekty kilku dawnych rekordów napojów, w których automat błędnie szacował
+// błonnik z procentowej zawartości orzechów albo nazwy kategorii.
+const legacyBeverageFixes = {
+  'honey':{fiber100:0,carbs100:82.4,note:'Korekta profilu miodu: miód nie zawiera istotnego błonnika; węglowodany 82,4 g/100 g.'},
+  'mleko-migdalowe':{fiber100:0.3,note:'Korekta błonnika: napój migdałowy nie ma 12,5 g błonnika/100 g; zastosowano profil napoju niesłodzonego z etykiety Alpro jako punkt odniesienia.'},
+  'mleko-migdalowe-light':{fiber100:0.3,note:'Korekta błonnika w napoju migdałowym: nie należy stosować wartości dla całych migdałów.'},
+  'mleko-migdalowe-lactose-free':{fiber100:0.3,note:'Korekta błonnika w napoju migdałowym: nie należy stosować wartości dla całych migdałów.'},
+  'mleko-migdalowe-fruit':{fiber100:0.3,note:'Korekta błonnika w napoju migdałowym: nie należy stosować wartości dla całych migdałów.'},
+  'dairy-almond-drink-vanilla':{fiber100:0.4,note:'Korekta automatycznej estymacji błonnika; profil odpowiada napojowi migdałowemu smakowemu, nie całym migdałom.'},
+  'kawa-czarna':{kcal100:1,protein100:0.12,fat100:0.02,carbs100:0,fiber100:0,note:'Korekta profilu czarnej kawy parzonej bez dodatków zgodnie z USDA FDC 171890.'},
+  'tea':{kcal100:1,protein100:0,fat100:0,carbs100:0.3,fiber100:0,note:'Korekta profilu czarnej herbaty parzonej bez dodatków zgodnie z USDA FDC 173227.'}
+};
+for (const [legacyId,fix] of Object.entries(legacyBeverageFixes)) {
+  const base = products.find(p=>p.id===legacyId && p.store==='Ogólne');
+  if (!base) continue;
+  for (const key of ['kcal100','protein100','fat100','carbs100','fiber100']) if (fix[key] !== undefined) base[key] = fix[key];
+  base.dataNote = `${base.dataNote||''} ${fix.note}`.trim();
+  base.nutritionMethod = 'Korekta profilu napoju na podstawie źródła referencyjnego wskazanego w dataNote; pozycja ogólna, nie marka handlowa.';
+  base.nutritionStatus = 'published-reference-corrected';
+  base.nutritionConfidence = 'medium; ogólny profil naparu/napoju, marka i sposób przygotowania mogą się różnić';
+  base.nutrientProvenance = {energy100:'published-reference',protein100:'published-reference',fat100:'published-reference',carbs100:'published-reference',fiber100:'published-reference'};
+  base.nutritionCheckedAt = BEVERAGE_AUDIT_DATE;
+}
+// Aktualizuj indeksy sklepowe powiązane ze skorygowanymi pozycjami bazowymi.
+for (const p of products.filter(p=>p.referenceBaseId && legacyBeverageFixes[p.referenceBaseId])) {
+  const base = products.find(x=>x.id===p.referenceBaseId && x.store==='Ogólne');
+  if (!base) continue;
+  for (const key of ['kcal100','protein100','fat100','carbs100','fiber100']) p[key]=base[key];
+  p.dataNote = `${p.dataNote||''} Zaktualizowano wartości razem z bazowym profilem ${base.id}.`;
+  p.nutritionMethod = 'Wartości skopiowane z poprawionego profilu ogólnego; nie są etykietą konkretnego SKU.';
+  p.nutritionStatus = 'best-estimate';
+  p.nutritionConfidence = 'low-to-medium; referencja ogólna użyta dla indeksu sklepu';
+  p.nutrientProvenance = {energy100:'estimated-reference',protein100:'estimated-reference',fat100:'estimated-reference',carbs100:'estimated-reference',fiber100:'estimated-reference'};
+}
+
+// Aktualizacja liczników katalogu bez zmiany struktury pojedynczego produktu.
+productCatalogInfo.count = products.length;
+productCatalogInfo.generic = products.filter(p=>p.store==='Ogólne').length;
+productCatalogInfo.storeCount = products.length-productCatalogInfo.generic;
+productCatalogInfo.beverageCount = products.filter(p=>p.category==='Napoje').length;
+productCatalogInfo.beverageAdditions = products.filter(p=>p.id.startsWith('drink:') || p.id.startsWith('drink-home:')).length;
+productCatalogInfo.version = '2026-11-23.1';
+productCatalogInfo.auditDate = BEVERAGE_AUDIT_DATE;
+productCatalogInfo.nutritionQuality.manufacturerLabel100mlRows = products.filter(p=>p.nutritionStatus==='manufacturer-label-per-100ml-converted-to-100g').length;
+productCatalogInfo.nutritionQuality.recipeCalculatedBeverageRows = products.filter(p=>p.nutritionStatus==='recipe-calculated-reference-estimate').length;
+productCatalogInfo.note = `${productCatalogInfo.note} Rozszerzenie 2026-11-23: produkty napojowe są zapisane na 100 g i z gramaturą porcji w g. Dane producentów deklarowane na 100 ml są konwertowane do 100 g przez jawnie zapisaną przybliżoną gęstość; napoje domowe są liczone z jawnych wag składników. Nie dodano jednostek ml/l ani nowych pól modelu.`;
+
+
+// Produkty suche do przygotowania napojów — odrębne od gotowego naparu.
+function addDryBeverageProduct({id,name,brand='',values,sourceUrl,sourceLabel,unitWeight=2,aliases=[],dataNote,confidence='high'}) {
+  addIfNewBeverage({
+    id:`drink-powder:${id}`,name,brand,category:'Napoje',store:'Ogólne',
+    source:`${sourceLabel} · profil produktu suchego`,sourceKind:'published-reference',sourceUrl,
+    sourceLicense:'Dane składu żywności z publicznej bazy USDA FoodData Central; domena publiczna CC0 1.0.',
+    kcal100:values[0],protein100:values[1],fat100:values[2],carbs100:values[3],fiber100:values[4],
+    unitWeight,aliases,
+    dataNote:dataNote||'Wartości na 100 g suchego produktu. To nie jest kaloryczność naparu po przygotowaniu; do napoju gotowego użyj osobnej pozycji recepturowej.',
+    nutritionStatus:'published-reference-usda',nutritionConfidence:confidence,
+    nutritionMethod:'Wartości składu suchego produktu na 100 g; nie przeliczono ich na gotowy napój.',
+    nutritionCheckedAt:BEVERAGE_AUDIT_DATE,sourceRefs:[sourceUrl],
+    nutrientProvenance:{energy100:'USDA-FDC-reference',protein100:'USDA-FDC-reference',fat100:'USDA-FDC-reference',carbs100:'USDA-FDC-reference',fiber100:'USDA-FDC-reference'},
+    carbsConvention:'USDA total carbohydrate normalized to available carbohydrate by subtracting dietary fiber; fiber reported separately'
+  });
+}
+addDryBeverageProduct({id:'instant-coffee-powder',name:'Kawa rozpuszczalna w proszku, sucha',values:[353,12.2,0.5,75.4,0],sourceUrl:'https://fdc.nal.usda.gov/food-details/171893/nutrients',sourceLabel:'USDA FoodData Central FDC 171893',unitWeight:2,aliases:['kawa instant sucha','granulki kawy rozpuszczalnej'],dataNote:'Profil suchej kawy rozpuszczalnej na 100 g: 353 kcal, 12,2 g białka, 0,5 g tłuszczu i 75,4 g węglowodanów. Nie mylić z gotowym naparem, który ma około 1–4 kcal/100 g zależnie od ilości użytego proszku.'});
+addDryBeverageProduct({id:'unsweetened-cocoa-powder',name:'Kakao naturalne niesłodzone w proszku',values:[228,19.6,13.7,20.9,37],sourceUrl:'https://fdc.nal.usda.gov/food-details/19165/nutrients',sourceLabel:'USDA FoodData Central FDC 19165',unitWeight:10,aliases:['kakao naturalne','kakao gorzkie proszek','kakao bez cukru'],dataNote:'USDA podaje 57,9 g węglowodanów ogółem i 37 g błonnika. W tym modelu carbs100 oznacza węglowodany przyswajalne, dlatego wpisano 20,9 g, a błonnik wykazano oddzielnie.'});
+
+// Doprecyzowanie produktu przygotowanego z kawy rozpuszczalnej.
+const instantCup = products.find(p=>p.id==='drink-home:coffee-instant');
+if (instantCup) {
+  const ingredient = DRINK_INGREDIENTS.instantCoffeeDry;
+  const total = 200;
+  instantCup.kcal100 = roundBeverage((353*2/100)*100/total);
+  instantCup.protein100 = roundBeverage((12.2*2/100)*100/total);
+  instantCup.fat100 = roundBeverage((0.5*2/100)*100/total);
+  instantCup.carbs100 = roundBeverage((75.4*2/100)*100/total);
+  instantCup.fiber100 = 0;
+  instantCup.dataNote = 'Receptura: 198 g wody + 2 g suchej kawy rozpuszczalnej USDA FDC 171893. Wartości obliczono z mas składników; ilość kawy instant może być inna w zależności od marki i mocy naparu.';
+  instantCup.nutritionMethod = 'Bilans masowy: 2 g suchej kawy instant + 198 g wody; wartości suchego proszku USDA FDC 171893.';
+  instantCup.nutritionConfidence = 'medium; receptura jawna, zawartość proszku zależy od sposobu przygotowania';
+  instantCup.sourceRefs = ['https://whatyoueat.io/foods/171893-instant-coffee-powder'];
+}
+// Miód bez błonnika jako składnik oraz podstawowa pozycja katalogowa.
+const honeyBase = products.find(p=>p.id==='honey' && p.store==='Ogólne');
+if (honeyBase) {
+  honeyBase.fiber100=0;
+  honeyBase.carbs100=82.4;
+  honeyBase.dataNote = `${honeyBase.dataNote||''} Korekta: miód przyjęto jako produkt bez błonnika; węglowodany 82,4 g/100 g.`;
+  honeyBase.nutritionMethod='Profil referencyjny miodu, bez błonnika; wartości ogólne, nie dla konkretnej odmiany.';
+  honeyBase.nutritionStatus='published-reference-corrected';
+  honeyBase.nutritionConfidence='medium; naturalny miód różni się składem w zależności od odmiany i wilgotności';
+  honeyBase.nutrientProvenance={energy100:'published-reference',protein100:'published-reference',fat100:'published-reference',carbs100:'published-reference',fiber100:'published-reference-zero-fiber'};
+}
+for (const p of products.filter(p=>p.referenceBaseId==='honey')) {
+  p.fiber100=0;p.carbs100=82.4;
+  p.nutrientProvenance={energy100:'estimated-reference',protein100:'estimated-reference',fat100:'estimated-reference',carbs100:'estimated-reference',fiber100:'estimated-reference-zero-fiber'};
+  p.dataNote=`${p.dataNote||''} Skorygowano profil bazowy miodu: 0 g błonnika.`;
+}
+
+productCatalogInfo.count = products.length;
+productCatalogInfo.generic = products.filter(p=>p.store==='Ogólne').length;
+productCatalogInfo.storeCount = products.length-productCatalogInfo.generic;
+productCatalogInfo.beverageCount = products.filter(p=>p.category==='Napoje').length;
+productCatalogInfo.beverageAdditions = products.filter(p=>p.id.startsWith('drink:') || p.id.startsWith('drink-home:') || p.id.startsWith('drink-powder:')).length;
+productCatalogInfo.nutritionQuality.manufacturerLabel100mlRows = products.filter(p=>p.nutritionStatus==='manufacturer-label-per-100ml-converted-to-100g').length;
+productCatalogInfo.nutritionQuality.recipeCalculatedBeverageRows = products.filter(p=>p.nutritionStatus==='recipe-calculated-reference-estimate').length;
+productCatalogInfo.nutritionQuality.usdaBeveragePowderRows = products.filter(p=>p.nutritionStatus==='published-reference-usda').length;
+
+const oldUnsweetTea = products.find(p=>p.id==='herbata-mrozona-unsweetened' && p.store==='Ogólne');
+if (oldUnsweetTea) { oldUnsweetTea.name='Herbata mrożona bez cukru (profil ogólny)'; oldUnsweetTea.aliases=[...(oldUnsweetTea.aliases||[]),'ice tea zero','herbata mrożona niesłodzona']; oldUnsweetTea.dataNote=`${oldUnsweetTea.dataNote||''} Doprecyzowano nazwę: produkt oznacza wariant bez dodatku cukru.`; }
+const oldCocoaWater = products.find(p=>p.id==='kakao-woda-unsweetened' && p.store==='Ogólne');
+if (oldCocoaWater) { oldCocoaWater.name='Kakao na wodzie bez cukru (profil ogólny)'; oldCocoaWater.aliases=[...(oldCocoaWater.aliases||[]),'kakao bez cukru na wodzie']; oldCocoaWater.dataNote=`${oldCocoaWater.dataNote||''} Doprecyzowano nazwę: wariant bez dodatku cukru.`; }
+const oldDilutedCoffee = products.find(p=>p.id==='kawa-czarna-diluted' && p.store==='Ogólne');
+if (oldDilutedCoffee) { oldDilutedCoffee.kcal100=1; oldDilutedCoffee.protein100=0.12; oldDilutedCoffee.fat100=0.02; oldDilutedCoffee.carbs100=0; oldDilutedCoffee.fiber100=0; oldDilutedCoffee.dataNote=`${oldDilutedCoffee.dataNote||''} Po rozcieńczeniu wodą energia nie spada do 0; przyjęto około 1 kcal/100 g dla naparu kawowego.`; }
+// Tymbark deklaruje <0,5 g białka/100 ml w soku szpinakowym; przechowujemy
+// środkową wartość przedziału jako szacunek, a nie udajemy dokładnego odczytu.
+const spinachKiwi = products.find(p=>p.id==='drink:tymbark-spinach-kiwi');
+if (spinachKiwi) {
+  spinachKiwi.nutritionStatus='manufacturer-label-with-protein-range-estimate';
+  spinachKiwi.nutritionConfidence='medium; energia, tłuszcz, węglowodany i błonnik producenta; białko <0,5 g zapisane jako midpoint 0,25 g';
+  spinachKiwi.nutritionMethod='Dane producenta na 100 ml przeliczone na 100 g gęstością 1,03 g/ml; białko zadeklarowane jako <0,5 g/100 ml, w bazie zapisano szacunkowy środek przedziału 0,25 g/100 ml.';
+  spinachKiwi.nutrientProvenance.protein100='manufacturer-declares-less-than-0.5g; midpoint-estimate';
+  spinachKiwi.dataNote += ' Białko producent podaje jako <0,5 g/100 ml; w rekordzie użyto 0,25 g/100 ml jako estymacji, nie dokładnej wartości.';
+}
+// Spójność pól pomocniczych starej normalizacji w rekordach poprawionych.
+for (const id of ['honey','mleko-migdalowe','mleko-migdalowe-light','mleko-migdalowe-lactose-free','mleko-migdalowe-fruit','dairy-almond-drink-vanilla']) {
+  const p = products.find(x=>x.id===id && x.store==='Ogólne');
+  if (p && 'totalCarbsIncludingFiber100' in p) p.totalCarbsIncludingFiber100 = roundBeverage(p.carbs100+p.fiber100);
+}
+for (const p of products.filter(x=>x.id.startsWith('catalog-'))) {
+  if (p.referenceBaseId && ['honey','mleko-migdalowe','mleko-migdalowe-light','mleko-migdalowe-lactose-free','mleko-migdalowe-fruit','dairy-almond-drink-vanilla'].includes(p.referenceBaseId)) {
+    const base=products.find(x=>x.id===p.referenceBaseId && x.store==='Ogólne');
+    if (base) for (const key of ['kcal100','protein100','fat100','carbs100','fiber100']) p[key]=base[key];
+  }
+}
+productCatalogInfo.count=products.length;
+productCatalogInfo.beverageCount=products.filter(p=>p.category==='Napoje').length;
+productCatalogInfo.beverageAdditions=products.filter(p=>p.id.startsWith('drink:') || p.id.startsWith('drink-home:') || p.id.startsWith('drink-powder:')).length;
+productCatalogInfo.nutritionQuality.manufacturerLabel100mlRows=products.filter(p=>p.nutritionStatus==='manufacturer-label-per-100ml-converted-to-100g' || p.nutritionStatus==='manufacturer-label-with-protein-range-estimate').length;
+
+// Dalsze napoje sklepowe i poprawki receptur.
+// Monster publikuje część informacji (cukry lub wartości porcji), nie pełną
+// etykietę dla wszystkich wariantów; w takich rekordach energia jest wyliczona
+// z deklarowanych węglowodanów i nie jest przedstawiana jako kcal producenta.
+function addPartialManufacturerBeverage({id,name,brand,per100ml,density=1.02,sourceUrl,sourceLabel,unitWeight=250,aliases=[],note}) {
+  const [kcal,protein,fat,carbs,fiber=0]=per100ml;
+  const div=density;
+  addIfNewBeverage({
+    id:`drink:${id}`,name,brand,category:'Napoje',store:'Ogólne',
+    source:`${sourceLabel} · częściowe dane producenta; kcal przeliczone/oszacowane`,
+    sourceKind:'manufacturer-partial-composition-estimate',sourceUrl,
+    sourceLicense:'Publiczne informacje producenta; część pól nie jest podana jako pełna tabela wartości odżywczych.',
+    kcal100:roundBeverage(kcal/div),protein100:roundBeverage(protein/div),fat100:roundBeverage(fat/div),carbs100:roundBeverage(carbs/div),fiber100:roundBeverage(fiber/div),
+    unitWeight,aliases,
+    dataNote:`Producent publikuje tylko część składu/parametrów. Wartości źródłowe na 100 ml przeliczono na 100 g przybliżoną gęstością ${div} g/ml. ${note} Wartość energii jest obliczona lub oszacowana, a nie pełną deklaracją kcal producenta.`,
+    nutritionStatus:'manufacturer-partial-label-energy-estimated',
+    nutritionConfidence:'low-to-medium; producent nie publikuje pełnej tabeli w dostępnej karcie produktu',
+    nutritionMethod:'Węglowodany odczytane z publikacji producenta; kcal oszacowano współczynnikiem 4 kcal/g węglowodanów; konwersja ml→g używa przybliżonej gęstości.',
+    nutritionCheckedAt:BEVERAGE_AUDIT_DATE,sourceRefs:[sourceUrl],
+    nutrientProvenance:{energy100:'calculated-from-manufacturer-reported-carbohydrate',protein100:'assumed-zero-for-clear-beverage',fat100:'assumed-zero-for-clear-beverage',carbs100:'manufacturer-reported-sugars-or-carbohydrate',fiber100:'assumed-zero-for-clear-beverage'},
+    carbsConvention:'węglowodany / cukry z informacji producenta; błonnik 0 jako napój klarowny'
+  });
+}
+addPartialManufacturerBeverage({id:'monster-original',name:'Monster Energy Original Green',brand:'Monster Energy',per100ml:[44,0,0,11,0],density:1.04,sourceUrl:'https://www.monsterenergy.com/pl-pl/energy-drinks/monster-energy/oryginalny-zielony/',sourceLabel:'Monster Energy Polska',aliases:['monster zielony','monster klasyczny'],note:'Strona producenta podaje 55 g cukru na puszkę 500 ml. Węglowodany oszacowano jako 11 g/100 ml, a energię 44 kcal/100 ml wyliczono z cukru; producent nie pokazuje na tej stronie pełnej tabeli kcal/makro.'});
+addPartialManufacturerBeverage({id:'monster-ultra-white',name:'Monster Energy Ultra (biały)',brand:'Monster Energy',per100ml:[2.2,0,0,0.88,0],density:1.001,sourceUrl:'https://www.monsterenergy.com/pl-pl/energy-drinks/zero-cukru/ultra-bez-cukru/',sourceLabel:'Monster Energy Polska',aliases:['biały monster','monster ultra white','monster ultra'],note:'Strona producenta podaje 11 kcal i 4,4 g węglowodanów na 500 ml. Tłuszcz i białko nie są pokazane w skróconej tabeli; zapisano 0 dla napoju klarownego.'});
+addPartialManufacturerBeverage({id:'monster-monarch',name:'Monster Juiced Monarch',brand:'Monster Energy',per100ml:[41.6,0,0,10.4,0],density:1.04,sourceUrl:'https://www.monsterenergy.com/pl-pl/energy-drinks/juiced-monster/monarch/',sourceLabel:'Monster Energy Polska',aliases:['monster monarch','monster brzoskwinia nektarynka'],note:'Strona producenta podaje 52 g cukru na puszkę 500 ml. Węglowodany oszacowano na 10,4 g/100 ml, a energię 41,6 kcal/100 ml obliczono z deklaracji cukru; nie jest to odczyt kcal z pełnej tabeli producenta.'});
+
+// Popularne domowe dodatki i warianty herbaty.
+DRINK_INGREDIENTS.raspberrySyrup={v:[250,0,0,62,0],source:'syrop malinowy; szacunek dla syropu owocowego z cukrem'};
+DRINK_INGREDIENTS.iceCream={v:[207,3.5,11,24,0],source:'profil istniejącego produktu: lody śmietankowe 207 kcal/100 g'};
+DRINK_INGREDIENTS.coffee3in1Dry={v:[420,7,11,74,0.5],source:'typowy profil kawy 3w1 w proszku; estymacja kategorii, nie konkretnej marki'};
+addRecipeBeverage({id:'tea-raspberry-syrup',name:'Herbata czarna z syropem malinowym',parts:[['tea',190],['raspberrySyrup',10]],aliases:['herbata z sokiem malinowym','herbata malinowa z syropem'],unitWeight:200});
+addRecipeBeverage({id:'tea-raspberry-lemon',name:'Herbata czarna z syropem malinowym i cytryną',parts:[['tea',180],['raspberrySyrup',10],['lemon',10]],aliases:['herbata malinowa cytryna'],unitWeight:200});
+addRecipeBeverage({id:'tea-chai-honey',name:'Chai tea z mlekiem 2% i miodem',parts:[['tea',40],['milk2',150],['honey',10]],aliases:['chai z miodem'],unitWeight:200});
+
+// Popularny napój instant 3w1: brak jednego standardowego składu, dlatego
+// produkt proszkowy i przygotowana filiżanka są jednoznacznie oznaczone jako
+// szacunek kategorii, który należy zastąpić etykietą konkretnej saszetki.
+addIfNewBeverage({
+  id:'drink-powder:coffee-3in1-estimate',name:'Kawa 3w1 w proszku (profil orientacyjny)',brand:'',category:'Napoje',store:'Ogólne',
+  source:'Szacunek kategorii produktu instant; brak jednej uniwersalnej etykiety 3w1',sourceKind:'best-estimate',sourceUrl:'https://fdc.nal.usda.gov/',
+  sourceLicense:'Autorski profil orientacyjny; nie jest etykietą producenta ani wynikiem badania.',
+  kcal100:420,protein100:7,fat100:11,carbs100:74,fiber100:0.5,unitWeight:18,aliases:['kawa trzy w jednym','kawa 3 in 1','coffee 3in1'],
+  dataNote:'Orientacyjny profil suchej mieszanki kawy, cukru i zabielacza. Różne saszetki 3w1 mają bardzo różne gramatury i skład; pozycję należy dopasować do etykiety konkretnej marki.',
+  nutritionStatus:'best-estimate-category',nutritionConfidence:'low; skład 3w1 znacząco różni się między markami',
+  nutritionMethod:'Szacunek składu proszku 3w1 na podstawie typowej mieszanki cukru, zabielacza i kawy instant; kcal zgodne orientacyjnie z makro.',
+  nutritionCheckedAt:BEVERAGE_AUDIT_DATE,sourceRefs:[],
+  nutrientProvenance:{energy100:'category-estimate',protein100:'category-estimate',fat100:'category-estimate',carbs100:'category-estimate',fiber100:'category-estimate'},
+  carbsConvention:'węglowodany przyswajalne; błonnik osobno'
+});
+addRecipeBeverage({id:'coffee-3in1-cup',name:'Kawa 3w1 przygotowana z 18 g proszku',parts:[['water',182],['coffee3in1Dry',18]],aliases:['kawa 3w1 gotowa','kawa trzy w jednym z saszetki'],unitWeight:200,note:'Mieszanka proszku jest kategorią orientacyjną; wynik trzeba zastąpić danymi konkretnego opakowania.'});
+
+// Naprawienie receptury milkshake: składniki muszą odpowiadać nazwie napoju.
+const vanillaMilkshake = products.find(p=>p.id==='drink-home:other-milkshake-vanilla');
+if (vanillaMilkshake) {
+  const parts=[['milk2',130],['iceCream',50],['water',20]];
+  const sum=[0,0,0,0,0];
+  for (const [ingredient,grams] of parts) DRINK_INGREDIENTS[ingredient].v.forEach((v,i)=>sum[i]+=v*grams/100);
+  const vals=sum.map(v=>roundBeverage(v));
+  [vanillaMilkshake.kcal100,vanillaMilkshake.protein100,vanillaMilkshake.fat100,vanillaMilkshake.carbs100,vanillaMilkshake.fiber100]=vals;
+  vanillaMilkshake.dataNote='Wartości na 100 g. Receptura orientacyjna: 130 g mleka 2% + 50 g lodów śmietankowych + 20 g wody. Wyliczenie z profili składników; dokładna receptura i marka lodów zmieniają wynik.';
+  vanillaMilkshake.nutritionMethod='Bilans masowy receptury: 130 g mleka 2%, 50 g lodów śmietankowych, 20 g wody; profil lodów pochodzi z odpowiedniego produktu ogólnego w products.js.';
+  vanillaMilkshake.nutritionConfidence='medium; skład receptury określony, profil lodów jest kategorią referencyjną';
+}
+// Zaktualizuj metryki po dopisaniu kolejnych napojów.
+productCatalogInfo.count=products.length;
+productCatalogInfo.generic=products.filter(p=>p.store==='Ogólne').length;
+productCatalogInfo.storeCount=products.length-productCatalogInfo.generic;
+productCatalogInfo.beverageCount=products.filter(p=>p.category==='Napoje').length;
+productCatalogInfo.beverageAdditions=products.filter(p=>p.id.startsWith('drink:') || p.id.startsWith('drink-home:') || p.id.startsWith('drink-powder:')).length;
+productCatalogInfo.nutritionQuality.manufacturerLabel100mlRows=products.filter(p=>p.nutritionStatus==='manufacturer-label-per-100ml-converted-to-100g').length;
+productCatalogInfo.nutritionQuality.manufacturerPartialRows=products.filter(p=>p.nutritionStatus==='manufacturer-partial-label-energy-estimated' || p.nutritionStatus==='manufacturer-label-with-protein-range-estimate').length;
+productCatalogInfo.nutritionQuality.recipeCalculatedBeverageRows=products.filter(p=>p.nutritionStatus==='recipe-calculated-reference-estimate').length;
+productCatalogInfo.version='2026-11-23.2';
+
+// Precyzyjniejsze metadane dla Monster Ultra — producent publikuje energię
+// i węglowodany na 500 ml; nie wyliczamy energii ponownie z makro.
+const monsterUltra = products.find(p=>p.id==='drink:monster-ultra-white');
+if (monsterUltra) {
+  monsterUltra.nutritionStatus='manufacturer-partial-energy-carbs-per-serving';
+  monsterUltra.nutritionConfidence='medium; energia i węglowodany z deklaracji producenta na 500 ml, gęstość do konwersji 100 g przybliżona; białko i tłuszcz przyjęte jako 0 dla napoju klarownego';
+  monsterUltra.nutritionMethod='Producent podaje 11 kcal i 4,4 g węglowodanów na 500 ml. Wartości przeliczono na 100 g przybliżoną gęstością 1,001 g/ml. Białko i tłuszcz nie są pokazane w dostępnej tabeli skróconej.';
+  monsterUltra.nutrientProvenance.energy100='manufacturer-official-energy-per-500ml; converted-to-100g-by-estimated-density';
+  monsterUltra.nutrientProvenance.carbs100='manufacturer-official-carbohydrate-per-500ml; converted-to-100g-by-estimated-density';
+}
+// Zachowaj spójne nazwy w indeksach sklepów dla poprawionych profili bazowych.
+for (const p of products.filter(x=>x.referenceBaseId==='herbata-mrozona-unsweetened' || x.referenceBaseId==='kakao-woda-unsweetened')) {
+  const base=products.find(x=>x.id===p.referenceBaseId && x.store==='Ogólne');
+  if (base) p.name=`${base.name} — asortyment ${p.store}`;
+}
+productCatalogInfo.count=products.length;
+productCatalogInfo.beverageCount=products.filter(p=>p.category==='Napoje').length;
+productCatalogInfo.beverageAdditions=products.filter(p=>p.id.startsWith('drink:') || p.id.startsWith('drink-home:') || p.id.startsWith('drink-powder:')).length;
+productCatalogInfo.version='2026-11-23.3';
+
+productCatalogInfo.auditDate=BEVERAGE_AUDIT_DATE;
+const coffee3in1Powder = products.find(p=>p.id==='drink-powder:coffee-3in1-estimate');
+if (coffee3in1Powder) coffee3in1Powder.sourceRefs=['https://fdc.nal.usda.gov/'];
+productCatalogInfo.auditDate=BEVERAGE_AUDIT_DATE;
+const legacyCocoaWaterSweet = products.find(p=>p.id==='kakao-woda' && p.store==='Ogólne');
+if (legacyCocoaWaterSweet) { legacyCocoaWaterSweet.name='Kakao na wodzie z cukrem (profil orientacyjny)'; legacyCocoaWaterSweet.aliases=[...(legacyCocoaWaterSweet.aliases||[]),'kakao wodne słodzone profil ogólny']; }
+productCatalogInfo.count=products.length;
+productCatalogInfo.beverageCount=products.filter(p=>p.category==='Napoje').length;
