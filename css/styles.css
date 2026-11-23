@@ -242,6 +242,15 @@ body[data-profile="female"]{--profile-accent:#c65b91}body[data-profile="male"]{-
 .auth-gate{position:fixed;inset:0;z-index:30000;display:grid;place-items:center;padding:20px;background:rgba(13,31,24,.66);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
 .auth-gate.hidden{display:none!important}.auth-card{width:min(430px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:#fff;border:1px solid #e1e9e1;border-radius:26px;padding:clamp(22px,5vw,34px);box-shadow:0 28px 100px rgba(0,0,0,.28)}
 .auth-brand{display:flex;align-items:center;gap:11px;margin-bottom:25px;font:800 15px Manrope;color:#234c3d}.auth-brand img{width:42px;height:42px;object-fit:contain}.auth-card h1{font:800 clamp(25px,6vw,32px) Manrope;letter-spacing:-.05em;margin:5px 0 8px;color:#193b30}.auth-intro{font-size:13px;line-height:1.6;color:#758078;margin:0 0 22px}.auth-form{display:grid;gap:13px}.auth-form label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#53665b}.auth-form input{width:100%;min-height:46px;border:1px solid #dce6dd;border-radius:12px;padding:11px 13px;font-family:inherit;font-size:13px;font-weight:500;color:#1d3329;background:#fbfdfb;outline:none}.auth-form input:focus{border-color:#6a9a7a;box-shadow:0 0 0 3px #6a9a7a22}.auth-links{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px}.auth-links button{border:0;background:none;padding:4px 0;color:#397354;font-size:11px;font-weight:800}.auth-footnote{border-top:1px solid #edf1ed;padding-top:14px;margin:18px 0 0;font-size:10px;line-height:1.55;color:#89948c}.account-email{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px}.account-logout{padding:8px 11px;font-size:10px;white-space:nowrap}.auth-locked{overflow:hidden}
+/* Weryfikacja sesji: do czasu odpowiedzi Firebase w modalu jest loader, a nie gotowy formularz. */
+#authGate[data-state="checking"] #authPanel{display:none}
+#authGate:not([data-state="checking"]) .auth-checking{display:none}
+.auth-checking{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px 0 6px;text-align:center}
+.auth-checking b{font:800 14px Manrope;color:#193b30}
+.auth-checking small{font-size:11px;color:#89948c}
+.auth-spinner{width:34px;height:34px;border-radius:50%;border:3px solid #dbe9df;border-top-color:#1f634b;animation:auth-spin .8s linear infinite}
+@keyframes auth-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.auth-spinner{animation-duration:2.4s}}
 /* Profile accents: the application base remains green. */
 body[data-profile="female"]{--profile-accent:#c65b91}body[data-profile="female"] .profile-tab.active{border-color:#e7b8d0;background:#fff5fa}body[data-profile="female"] .profile-tab.active b{color:#c65b91}
 body[data-profile="male"]{--profile-accent:#397bc5}body[data-profile="male"] .profile-tab.active{border-color:#b8d1ee;background:#f3f8ff}body[data-profile="male"] .profile-tab.active b{color:#397bc5}
@@ -579,6 +588,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{
 .result-fav{width:30px;height:30px;display:grid;place-items:center;border:1px solid transparent;border-radius:9px;background:transparent;padding:0;flex:0 0 30px}
 .result-fav:hover{background:#f7efdb;border-color:#eddfbe}
 .result-fav.active{color:var(--gold)}
+/* Dotyk (iOS): po przetasowaniu wyników przeglądarka zostawia :hover na elemencie, który
+   znalazł się pod palcem — gwiazdka sąsiedniego produktu wyglądała jak zaznaczona. */
+@media(hover:none){
+  .result-fav:hover:not(.active){color:#b9c3bb;background:transparent;border-color:transparent}
+  .result-fav.active:hover{background:transparent;border-color:transparent}
+}
 .override-base{margin:0 0 12px;padding:9px 11px;border:1px solid #e7eee6;border-radius:11px;background:#f8fbf7;font-size:10.5px;line-height:1.45;color:#5f7267}
 .override-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 #overrideDialog .dialog-actions{flex-wrap:wrap}

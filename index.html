@@ -52,9 +52,11 @@
     <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 3.1l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.6l-5.3 2.7 1.1-5.9-4.3-4.1 5.9-.8z"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v6M12 7.6v.5"/></symbol>
   </svg>
-  <section id="authGate" class="auth-gate" aria-modal="true" role="dialog" aria-labelledby="authTitle">
+  <section id="authGate" class="auth-gate" data-state="checking" aria-modal="true" role="dialog" aria-labelledby="authTitle">
     <div class="auth-card">
       <div class="auth-brand"><img src="assets/icon.svg" alt=""><span>Dziennik Żywieniowy</span></div>
+      <div id="authChecking" class="auth-checking" role="status" aria-live="polite"><span class="auth-spinner" aria-hidden="true"></span><b>Sprawdzam zapamiętaną sesję…</b><small>Zwykle trwa to mniej niż sekundę.</small></div>
+      <div id="authPanel">
       <p class="eyebrow">TWOJA PRZESTRZEŃ</p><h1 id="authTitle">Zaloguj się</h1>
       <p class="auth-intro">Zaloguj się, aby bezpiecznie przechowywać swoje dzienniki, produkty i dania na koncie.</p>
       <form id="authForm" class="auth-form">
@@ -65,6 +67,7 @@
       </form>
       <div class="auth-links"><button type="button" id="authToggle">Nie masz konta? Utwórz konto</button><button type="button" id="authReset">Nie pamiętasz hasła?</button></div>
       <p class="auth-footnote">Sesja pozostaje zapamiętana na tym urządzeniu. Hasło obsługuje zewnętrzna usługa logowania — aplikacja go nie zapisuje.</p>
+      </div>
     </div>
   </section>
   <header class="topbar">

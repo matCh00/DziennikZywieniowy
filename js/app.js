@@ -1253,16 +1253,41 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape')closePortal();});
 // Account-scoped state: profiles/logs remain split by gender; custom products, plans and recipes
 // are shared between both profile tabs inside the same signed-in account.
 function setAuthBusy(busy){$('authSubmit').disabled=busy;$('authSubmit').innerHTML=busy?'Łączenie…':(authMode==='login'?`${ico('login')} Zaloguj się`:`${ico('plus')} Utwórz konto`);}
-function showAuthGate(message=''){ $('authGate').classList.remove('hidden');$('authError').textContent=message;$('accountEmail').textContent='';$('logoutButton').hidden=true;document.body.classList.add('auth-locked');document.querySelectorAll('body > header, body > main, body > footer, body > dialog').forEach(el=>el.inert=true); }
-function hideAuthGate(user){ $('authGate').classList.add('hidden');document.body.classList.remove('auth-locked');document.querySelectorAll('body > header, body > main, body > footer, body > dialog').forEach(el=>el.inert=false);$('accountEmail').textContent=user?.email||'';$('logoutButton').hidden=false; }
+function setAuthGateState(mode){const checking=mode==='checking';$('authGate').dataset.state=checking?'checking':'form';$('authGate').setAttribute('aria-busy',String(checking));}
+function showAuthGate(message='',{checking=false}={}){ $('authGate').classList.remove('hidden');setAuthGateState(checking?'checking':'form');$('authError').textContent=checking?'':message;$('accountEmail').textContent='';$('logoutButton').hidden=true;document.body.classList.add('auth-locked');document.querySelectorAll('body > header, body > main, body > footer, body > dialog').forEach(el=>el.inert=true); }
+function hideAuthGate(user){ setAuthGateState('form');$('authGate').classList.add('hidden');document.body.classList.remove('auth-locked');document.querySelectorAll('body > header, body > main, body > footer, body > dialog').forEach(el=>el.inert=false);$('accountEmail').textContent=user?.email||'';$('logoutButton').hidden=false; }
 function updateAuthMode(){const register=authMode==='register';$('authTitle').textContent=register?'Utwórz konto':'Zaloguj się';$('authSubmit').innerHTML=register?`${ico('plus')} Utwórz konto`:`${ico('login')} Zaloguj się`;$('authPassword').autocomplete=register?'new-password':'current-password';$('authPassword').minLength=register?8:1;$('authToggle').textContent=register?'Masz już konto? Zaloguj się':'Nie masz konta? Utwórz konto';$('authReset').hidden=register;$('authError').textContent='';}
+// Zapamiętana sesja: po powrocie do aplikacji od razu pokazujemy dane z lokalnej kopii,
+// a Firebase tylko potwierdza sesję w tle — bez mignięcia formularza logowania.
+const LAST_SESSION_KEY=`${STORE_KEY}:last-uid`;
+function rememberSession(user){try{localStorage.setItem(LAST_SESSION_KEY,user.uid);localStorage.setItem(`${LAST_SESSION_KEY}:email`,user.email||'');}catch{}}
+function forgetSession(){try{localStorage.removeItem(LAST_SESSION_KEY);localStorage.removeItem(`${LAST_SESSION_KEY}:email`);}catch{}}
+function cachedSession(){try{const uid=localStorage.getItem(LAST_SESSION_KEY);if(!uid||!localStorage.getItem(`${STORE_KEY}:user:${uid}`))return null;return {uid,email:localStorage.getItem(`${LAST_SESSION_KEY}:email`)||''};}catch{return null;}}
+let appPainted=false;let setupDialogShown=false;
+function paintState(){
+  document.body.dataset.profile=state.activeProfile||'female';
+  document.querySelectorAll('.profile-tab').forEach(b=>b.classList.toggle('active',b.dataset.profile===state.activeProfile));
+  $('catalogMode').value=state.catalogMode||'saved';$('onlineSource').value=state.onlineSource||'fatsecret';$('sourceControl').classList.toggle('hidden',$('catalogMode').value!=='online');
+  render();renderRecipes();renderWeekly();renderProductsView();refreshVesselSelects();renderVesselsView();
+  if(!appPainted){appPainted=true;showView('diary');}
+  if(!setupDialogShown&&profilesNeedInitialSetup(state.profiles)){setupDialogShown=true;setTimeout(openBothProfilesDialog,220);}
+}
+function bootFromCache(session){
+  userStoreKey=`${STORE_KEY}:user:${session.uid}`;
+  state=loadState(userStoreKey);
+  paintState();
+  hideAuthGate({email:session.email});
+}
 async function activateUser(user){
-  showAuthGate();
-  const key=`${STORE_KEY}:user:${user.uid}`;userStoreKey=key;
+  const key=`${STORE_KEY}:user:${user.uid}`;
+  const hadLocalCopy=Boolean(localStorage.getItem(key));
+  userStoreKey=key;
   const local=loadState(key);
-  firebaseSync=firebaseClient.forUser(user.uid);
+  const sync=firebaseClient.forUser(user.uid);firebaseSync=sync;
+  rememberSession(user);
+  if(hadLocalCopy){state=local;paintState();hideAuthGate(user);}else showAuthGate('',{checking:true});
   try{
-    const remote=await firebaseSync.load();
+    const remote=await sync.load();
     if(remote&&typeof remote==='object'){
       const base=defaultState();state={...base,...remote,profiles:{...base.profiles,...(remote.profiles||{})},logs:{...base.logs,...(remote.logs||{})},weights:{...base.weights,...(remote.weights||{})},customProducts:Array.isArray(remote.customProducts)?remote.customProducts:[],recipes:Array.isArray(remote.recipes)?remote.recipes:[],plans:Array.isArray(remote.plans)?remote.plans:[],vessels:Array.isArray(remote.vessels)?remote.vessels:[],favorites:{products:Array.isArray(remote.favorites?.products)?remote.favorites.products:[],dishes:Array.isArray(remote.favorites?.dishes)?remote.favorites.dishes:[]},overrides:{products:remote.overrides?.products&&typeof remote.overrides.products==='object'?remote.overrides.products:{},dishes:remote.overrides?.dishes&&typeof remote.overrides.dishes==='object'?remote.overrides.dishes:{}},pendingShare:remote.pendingShare&&Array.isArray(remote.pendingShare.items)?remote.pendingShare:null};
     }else{
@@ -1284,17 +1309,14 @@ async function activateUser(user){
         state.favorites[kind]=[...new Set([...remoteList,...localList])];
       }
     }
-    await firebaseSync.save(state); // also migrates the legacy single-document layout into account-scoped documents
     localStorage.setItem(key,JSON.stringify(state));
     $('saveState').innerHTML='<i></i> Konto · synchronizacja aktywna';
   }catch(error){
-    console.error('Firebase load:',error);state=local;$('saveState').innerHTML='<i style="background:#c47d52"></i> Błąd synchronizacji';toast('Nie udało się pobrać danych z chmury. Sprawdź połączenie z internetem i spróbuj ponownie.');
+    console.error('Firebase load:',error);if(!hadLocalCopy)state=local;$('saveState').innerHTML='<i style="background:#c47d52"></i> Błąd synchronizacji';toast('Nie udało się pobrać danych z chmury. Sprawdź połączenie z internetem i spróbuj ponownie.');
   }
-  document.body.dataset.profile=state.activeProfile||'female';
-  document.querySelectorAll('.profile-tab').forEach(b=>b.classList.toggle('active',b.dataset.profile===state.activeProfile));
-  $('catalogMode').value=state.catalogMode||'saved';$('onlineSource').value=state.onlineSource||'fatsecret';$('sourceControl').classList.toggle('hidden',$('catalogMode').value!=='online');
-  render();renderRecipes();renderWeekly();renderProductsView();refreshVesselSelects();renderVesselsView();showView('diary');hideAuthGate(user);
-  if(profilesNeedInitialSetup(state.profiles))setTimeout(openBothProfilesDialog,220);
+  paintState();hideAuthGate(user);
+  // Zapis do chmury (w tym migracja starego dokumentu) nie blokuje odsłonięcia aplikacji.
+  sync.save(JSON.parse(JSON.stringify(state))).catch(error=>{console.error('Firebase save:',error);if(firebaseSync===sync)$('saveState').innerHTML='<i style="background:#c47d52"></i> Błąd synchronizacji';});
 }
 
 $('authForm').addEventListener('submit',async e=>{e.preventDefault();if(!firebaseClient){$('authError').textContent='Logowanie nie jest jeszcze skonfigurowane. Skontaktuj się z administratorem aplikacji.';return;}const email=$('authEmail').value.trim();const password=$('authPassword').value;setAuthBusy(true);$('authError').textContent='';try{if(authMode==='register')await firebaseClient.register(email,password);else await firebaseClient.signIn(email,password);}catch(error){const map={'auth/invalid-credential':'Nieprawidłowy e-mail lub hasło.','auth/email-already-in-use':'To konto już istnieje. Zaloguj się.','auth/weak-password':'Hasło musi mieć co najmniej 8 znaków.','auth/invalid-email':'Podaj prawidłowy adres e-mail.','auth/too-many-requests':'Zbyt wiele prób. Spróbuj ponownie później.','auth/network-request-failed':'Brak połączenia z internetem.'};$('authError').textContent=map[error.code]||`Nie udało się zalogować (${error.code||'błąd'}).`;}finally{setAuthBusy(false);}});
@@ -1304,14 +1326,15 @@ $('logoutButton').addEventListener('click',async()=>{if(!confirm('Wylogować si�
 
 // Init — email/password auth is mandatory; Firebase LOCAL persistence remembers the session.
 async function initialiseApp(){
-  showAuthGate();
-  if(!firebaseConfigured(firebaseConfig)){ $('authError').textContent='Aplikacja wymaga konfiguracji Firebase. Uzupełnij js/firebase-config.js, włącz Email/Password Authentication i opublikuj reguły Firestore zgodnie z README_PL.md.';$('authSubmit').disabled=true;return;}
+  if(!firebaseConfigured(firebaseConfig)){ showAuthGate();$('authError').textContent='Aplikacja wymaga konfiguracji Firebase. Uzupełnij js/firebase-config.js, włącz Email/Password Authentication i opublikuj reguły Firestore zgodnie z README_PL.md.';$('authSubmit').disabled=true;return;}
+  const session=cachedSession();
+  if(session)bootFromCache(session);else showAuthGate('',{checking:true});
   try{
     firebaseClient=await initFirebaseClient(firebaseConfig);
     authUnsubscribe=firebaseClient.onAuthChanged(async user=>{
-      if(user){await activateUser(user);}else{authMode='login';updateAuthMode();$('authForm').reset();clearTimeout(firebaseSaveTimer);firebaseSync=null;userStoreKey=null;state=defaultState();showAuthGate();renderAuthSafe();}
+      if(user){await activateUser(user);}else{forgetSession();authMode='login';updateAuthMode();$('authForm').reset();clearTimeout(firebaseSaveTimer);firebaseSync=null;userStoreKey=null;state=defaultState();showAuthGate();renderAuthSafe();}
     });
-  }catch(error){console.error('Firebase init:',error);$('authError').textContent='Nie można połączyć z usługą logowania. Sprawdź połączenie z internetem i spróbuj ponownie.';}
+  }catch(error){console.error('Firebase init:',error);if(userStoreKey){toast('Brak połączenia z usługą logowania. Pracujesz na lokalnej kopii danych.');}else{showAuthGate('Nie można połączyć z usługą logowania. Sprawdź połączenie z internetem i spróbuj ponownie.');}}
 }
 function renderAuthSafe(){try{document.body.dataset.profile='female';}catch{}}
 initialiseApp();
